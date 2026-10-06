@@ -42,12 +42,14 @@ class WheelKeyService : AccessibilityService() {
 
         /** Whether the driver has switched this service on. Safe to call from any thread. */
         fun isEnabled(context: Context): Boolean = try {
-            val ours = ComponentName(context, WheelKeyService::class.java).flattenToString()
+            val component = ComponentName(context, WheelKeyService::class.java)
+            // Some ROMs store the shortened ".WheelKeyService" spelling, so both are accepted.
+            val ours = setOf(component.flattenToString(), component.flattenToShortString())
             Settings.Secure
                 .getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
                 .orEmpty()
                 .split(':')
-                .any { it.equals(ours, ignoreCase = true) }
+                .any { entry -> ours.any { it.equals(entry.trim(), ignoreCase = true) } }
         } catch (error: Exception) {
             Log.w(TAG, "could not read the accessibility service list", error)
             false
