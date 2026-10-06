@@ -8,7 +8,7 @@
 **这里记录的全部是吉利专属改动，或从上游移植的品牌无关改动。**
 上游的比亚迪专属功能不在本分支范围内，本文不再复述。
 
-**版本：** `0.2.9.1-geely-rc`（versionCode 29）· 包名 `com.shihab.diplay`
+**版本：** `0.3.0-geely-rc`（versionCode 30）· 包名 `com.shihab.diplay`
 
 ## 已在实车验证
 

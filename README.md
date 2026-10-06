@@ -8,7 +8,7 @@ which is itself a fork of [shihabal3amri/DiPlay](https://github.com/shihabal3amr
 Everything described here is either Geely-specific work or brand-neutral work ported from upstream.
 **Upstream's BYD-specific features are out of scope for this fork and are not documented here.**
 
-**Version:** `0.2.9.1-geely-rc` (versionCode 29) · App id `com.shihab.diplay`
+**Version:** `0.3.0-geely-rc` (versionCode 30) · App id `com.shihab.diplay`
 
 ## Verified on the car
 

@@ -6,12 +6,33 @@ This file records **this fork's** releases only. Upstream DiPlay maintains its o
 **Base:** upstream DiPlay **v0.2.7**, via `programmerguohuajing/DiPlay-Legacy-Android`.
 **Target:** Geely Xingrui E01 (ECARX E01 / MediaTek MT6735, GKUI 19, **Android 5.1 / API 22**).
 
-This is the fork's first published release. Earlier `-geely-rc` tags were withdrawn before release,
-so everything the fork adds is listed under it.
+---
+
+## 0.3.0-geely-rc — 2026-10-06
+
+### Diagnostics
+
+- **New: wireless startup diagnostics.** When a wireless connection stalls, the report now says which
+  step it stalled at, alongside interface state (up/down, multicast, usable address families),
+  Bonjour discovery counters and kernel receive/UDP counters. Observation only — it does not change
+  connection deadlines, address selection or retry behaviour. The watchdog that would have armed a
+  timeout after the start-session request is deliberately **not** included, since that changes
+  behaviour rather than observing it.
+
+### Documentation
+
+- README, README.zh-CN and this changelog now describe **this fork only**. Upstream's BYD feature
+  lists, its website links and its preview copy are gone; the GPL-3.0 / AGPL-3.0 attribution and the
+  accessory-identity disclosure are retained.
+- The compatibility, install, privacy, connection-setup and testing docs no longer carry BYD-only
+  sections.
 
 ---
 
 ## 0.2.9.1-geely-rc — 2026-10-06
+
+The fork's first published release. Earlier `-geely-rc` tags were withdrawn before release, so
+everything the fork added up to that point is listed here.
 
 ### Steering wheel — verified on the car
 
@@ -29,10 +50,6 @@ so everything the fork adds is listed under it.
 
 ### Wireless
 
-- **New: wireless startup diagnostics.** When a wireless connection stalls, the report now says which
-  step it stalled at, alongside interface state (up/down, multicast, usable address families),
-  Bonjour discovery counters and kernel receive/UDP counters. Observation only — it does not change
-  connection deadlines, address selection or retry behaviour.
 - Switch the car's own hotspot on instead of leaving the driver to do it in the car settings. The
   head unit's existing hotspot configuration is kept, and Wi-Fi station mode is released only on a
   retry, since that disconnects the car from whatever network it is on. Failures are now reported by

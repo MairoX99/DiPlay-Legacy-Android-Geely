@@ -1,7 +1,7 @@
 # Install and connect
 
-1. Park the car. Download `DiPlay-0.2.6.apk` from the official GitHub release linked on the website.
-2. Install on the Android head unit using its supported APK installation method. Do not install on the iPhone. Update over an existing DiPlay beta to retain settings and pairing records; the signing key is unchanged.
+1. Park the car. Download `DiPlay-Legacy-Geely-V030.apk` from this repository's latest release.
+2. Install on the Android head unit using its supported APK installation method. Do not install on the iPhone. ⚠️ This build is signed with a **different key** from upstream DiPlay, so it cannot be installed over it — uninstall `com.shihab.diplay` first, which loses app settings and pairing records.
 3. Open DiPlay. Grant the permissions requested for the features you use: Bluetooth/Nearby devices, Wi-Fi/Location on older Android, and microphone for Siri/calls. Allow notifications for connection controls.
 4. Close other phone-projection apps before connecting.
 
@@ -25,16 +25,12 @@ Start with 30 fps, Efficient video (HEVC) off and Default icon/text size. Try 80
 
 If reinstalling left an old group, close other projection apps, then use **Settings → Wireless connection help → Reset CarPlay Wi-Fi**. DiPlay asks before removing an unrecognized Wi-Fi Direct group. Updating in place is preferable to uninstalling.
 
-Use **Settings → Diagnostics → Save diagnostic report** after reproducing a problem. Android 10+ saves to **Downloads/DiPlay**; Android 9 uses a document picker. Review the file, then attach it to a GitHub issue with car model, DiLink/Android versions, iPhone/iOS, transport and reproduction steps. Nothing is uploaded automatically.
+Use **Settings → Diagnostics → Save diagnostic report** after reproducing a problem. Android 10+ saves to **Downloads/DiPlay**; Android 9 uses a document picker. Review the file, then attach it to a GitHub issue with car model, Android and head-unit versions, iPhone/iOS, transport and reproduction steps. Nothing is uploaded automatically.
 
 APK installation restrictions are controlled by your car's firmware. ADB is optional if your car supports it, not an app runtime requirement:
 
 ```sh
-adb install -r DiPlay-0.2.6.apk
+adb install -r DiPlay-Legacy-Geely-V030.apk
 ```
 
 Only use a trusted computer. A different signing certificate cannot update this build; do not uninstall until you have saved any reports you need.
-
-## BYD navigation
-
-See [BYD navigation displays](BYD_NAVIGATION.md) for the firmware scope, map metadata requirements, settings and cleanup behavior. No runtime ADB starter is required.
