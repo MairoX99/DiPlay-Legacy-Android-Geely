@@ -28,8 +28,8 @@ The generic accessibility filter and the ECARX vendor key codes upstream built a
 tree as fallbacks for other head units**. Neither was needed here: GKUI 19 does not expose an
 accessibility settings entry on this car, so that path cannot be switched on without ADB.
 
-Not yet verified on a car: USB permission auto-confirm, the diagnostic-export fallback, and the
-wireless startup diagnostics.
+Not yet verified on a car: USB permission auto-confirm, the diagnostic-export fallback, the audio
+stall timeline, and the wireless startup diagnostics.
 
 ## What this fork adds
 
