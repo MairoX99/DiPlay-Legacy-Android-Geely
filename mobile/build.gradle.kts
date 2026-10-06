@@ -18,7 +18,7 @@ android {
         targetSdk = 37
         multiDexEnabled = true
         versionCode = 26
-        versionName = "0.2.7"
+        versionName = "0.2.7-geely"
 
     }
 
