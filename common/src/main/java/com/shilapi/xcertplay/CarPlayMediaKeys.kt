@@ -242,7 +242,24 @@ internal object CarPlayMediaKeys {
             val currentContext = context ?: return
             if (controller == null) return
             if (session == null) {
+                // A car that hands the wheel over through its own input service sends the press on
+                // as an ACTION_MEDIA_BUTTON aimed at whichever receiver the framework considers the
+                // media button one. A session without these declares no interest and is passed over,
+                // leaving the wheel on the head unit's own player.
+                val mediaButtonReceiver = PendingIntent.getBroadcast(
+                    currentContext,
+                    0,
+                    Intent(Intent.ACTION_MEDIA_BUTTON).setComponent(
+                        ComponentName(currentContext, CarPlayMediaButtonReceiver::class.java),
+                    ),
+                    PendingIntent.FLAG_UPDATE_CURRENT,
+                )
                 session = MediaSession(currentContext, "DiPlay CarPlay").apply {
+                    setFlags(
+                        MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or
+                            MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS,
+                    )
+                    setMediaButtonReceiver(mediaButtonReceiver)
                     setCallback(CarPlayMediaCallback { index, _ -> send(index) }, mainHandler)
                     isActive = true
                 }
