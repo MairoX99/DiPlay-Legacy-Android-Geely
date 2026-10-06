@@ -27,15 +27,20 @@ export ANDROID_HOME DIPLAY_AUTH_ASSETS_DIR
 mkdir -p "$out"
 
 build_release() {
-    sign=$HOME/.diplay-signing
-    [ -f "$sign/keystore.properties" ] || {
-        echo "package-geely: $sign/keystore.properties is missing" >&2; exit 1; }
-    # Gradle reads ANDROID_*; the properties file uses storePassword/keyPassword.
-    set -a; . "$sign/keystore.properties"; set +a
-    ANDROID_KEYSTORE_PASSWORD=$storePassword
-    ANDROID_KEY_PASSWORD=$keyPassword
-    ANDROID_KEYSTORE_PATH=$sign/diplay-release.jks
-    ANDROID_KEY_ALIAS=diplay
+    sign=${DIPLAY_SIGNING_DIR:-$HOME/.diplay-signing}
+    # Local runs read $sign/keystore.properties; CI exports ANDROID_* directly, so the
+    # password never has to pass through a sourced file.
+    if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] && [ -f "$sign/keystore.properties" ]; then
+        set -a; . "$sign/keystore.properties"; set +a
+        ANDROID_KEYSTORE_PASSWORD=$storePassword
+        ANDROID_KEY_PASSWORD=$keyPassword
+    fi
+    ANDROID_KEYSTORE_PATH=${ANDROID_KEYSTORE_PATH:-$sign/diplay-release.jks}
+    ANDROID_KEY_ALIAS=${ANDROID_KEY_ALIAS:-diplay}
+    [ -n "${ANDROID_KEYSTORE_PASSWORD:-}" ] || {
+        echo "package-geely: no release keystore password ($sign/keystore.properties missing?)" >&2; exit 1; }
+    [ -n "${ANDROID_KEY_PASSWORD:-}" ] || {
+        echo "package-geely: no release key password" >&2; exit 1; }
     export ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD ANDROID_KEYSTORE_PATH ANDROID_KEY_ALIAS
     (cd "$root" && sh gradlew :mobile:assembleRelease)
     cp "$root/mobile/build/outputs/apk/release/mobile-release.apk" "$out/DiPlay-Legacy-Geely-$tag.apk"
