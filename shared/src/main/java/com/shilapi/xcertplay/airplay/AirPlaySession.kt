@@ -627,7 +627,11 @@ class AirPlaySession(
         try {
             val socket = server.accept()
             socket.setSoLinger(true, 0)
-            debugLog("airplay event connection accepted from ${socket.remoteSocketAddress}")
+            // Touches are small messages sent many times a second, and the iPhone does not answer them on
+            // this channel. Under Nagle's algorithm each touch waited for the delayed ACK of the previous
+            // one, so moves reached it in bunches instead of as they were made.
+            socket.tcpNoDelay = true
+            debugLog("airplay event connection accepted from ${socket.remoteSocketAddress} noDelay=${socket.tcpNoDelay}")
             eventSocket = socket
             val shared = pairVerify.shared
             if (shared == null) {
