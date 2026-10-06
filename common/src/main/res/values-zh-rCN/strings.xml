@@ -448,4 +448,6 @@
     <string name="adb_battery_reading">电池：%1$d%%，%2$d 公里。</string>
     <string name="adb_battery_unreadable">无法读取这辆车的电池信息，因此不会向 iPhone 声明这是电动车。</string>
     <string name="adb_battery_reconnect">如果 CarPlay 在电池数据就绪前已连接，请使用“应用并重新连接”以启用电池数据上报。</string>
+    <string name="wheel_key_service_label">DiPlay 方向盘按键</string>
+    <string name="wheel_key_service_description">让 DiPlay 为 CarPlay 接管方向盘的媒体按键。不开启时车机可能会把这些按键留给自己处理，导致 CarPlay 显示时方向盘无反应。音量键及其他按键不受影响。</string>
 </resources>

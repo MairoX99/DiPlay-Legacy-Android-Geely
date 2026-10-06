@@ -35,6 +35,7 @@ import com.shilapi.xcertplay.mfi.RemoteMfiAuthenticationClient
 import com.shilapi.xcertplay.mfi.LocalMfiAuthenticationClient
 import com.shilapi.xcertplay.network.CarPlayBonjour
 import com.shilapi.xcertplay.network.CarHotspotController
+import com.shilapi.xcertplay.network.HotspotStartResult
 import com.shilapi.xcertplay.network.diagnosticSummary
 import com.shilapi.xcertplay.network.CarPlayVpnService
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
@@ -1599,14 +1600,14 @@ class CarPlayController(
             else -> config.wirelessHotspotMode
         }
         if (hotspotMode == WirelessHotspotMode.MANUAL) {
-            CarHotspotController(appContext)
+            val started = CarHotspotController(appContext)
                 .ensureEnabled(CAR_HOTSPOT_ENABLE_TIMEOUT_MILLIS)
-                ?.let { reason ->
-                    throw IOException(
-                        "The car hotspot is off and DiPlay could not switch it on: $reason. " +
-                            "Turn it on in the car settings and connect again.",
-                    )
-                }
+            if (started != HotspotStartResult.READY) {
+                throw IOException(
+                    "The car hotspot is off and DiPlay could not switch it on: ${started.reason}. " +
+                        "Turn it on in the car settings and connect again.",
+                )
+            }
         }
         val manager: WirelessHotspotManager = when (hotspotMode) {
             WirelessHotspotMode.WIFI_P2P -> {

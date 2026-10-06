@@ -16,6 +16,19 @@ internal fun hotspotEnableAttempts(stationEnabled: Boolean): List<Boolean> =
     if (stationEnabled) listOf(false, true) else listOf(false)
 
 /**
+ * Why the switch did not finish. The driver is shown [reason], so a firmware that gates the
+ * permission is reported differently from a car that simply would not start its hotspot.
+ */
+internal enum class HotspotStartResult(val reason: String) {
+    READY("the hotspot is on"),
+    NO_WIFI_SERVICE("there is no Wi-Fi service"),
+    UNSUPPORTED("this firmware does not expose the hotspot API"),
+    PERMISSION_REQUIRED("the firmware does not give DiPlay permission to switch it on"),
+    FAILED("the car refused the request"),
+    TIMED_OUT("the car did not report the hotspot on in time"),
+}
+
+/**
  * Switches the head unit's own Wi-Fi hotspot on.
  *
  * DiPlay used to only read the hotspot state ([CarHotspotStatus]) and leave the driver to turn it
@@ -25,7 +38,9 @@ internal fun hotspotEnableAttempts(stationEnabled: Boolean): List<Boolean> =
  *
  * The AP methods are reached reflectively only because compileSdk no longer exposes them; on this
  * project's API 19 floor `setWifiApEnabled` is the platform's own public method. No vendor interface
- * is used — ECARX's own AP service belongs to head units newer than this fork targets.
+ * is used — ECARX's own AP service belongs to head units newer than this fork targets, and the
+ * tethering route other builds take (`IConnectivityManager.startTethering` with a caller package)
+ * does not exist before Android 11, so neither would ever run here.
  */
 internal class CarHotspotController(context: Context) {
     private val appContext: Context = context.applicationContext ?: context
@@ -41,36 +56,56 @@ internal class CarHotspotController(context: Context) {
         }.getOrNull()
     }
 
-    /**
-     * Turns the hotspot on when it is off and waits for the firmware to report it enabled. Returns
-     * null once it is on, or the reason it could not be switched on.
-     */
-    fun ensureEnabled(timeoutMillis: Long): String? {
+    /** Turns the hotspot on when it is off and waits for the firmware to report it enabled. */
+    fun ensureEnabled(timeoutMillis: Long): HotspotStartResult {
         require(timeoutMillis > 0) { "timeoutMillis must be positive" }
-        if (CarHotspotStatus.isEnabled(appContext) == true) return null
-        val wifi = wifi ?: return "there is no Wi-Fi service"
-        val setAp = setApEnabled ?: return "this firmware does not expose the hotspot API"
+        if (CarHotspotStatus.isEnabled(appContext) == true) return HotspotStartResult.READY
+        val wifi = wifi ?: return HotspotStartResult.NO_WIFI_SERVICE
+        val setAp = setApEnabled ?: return HotspotStartResult.UNSUPPORTED
 
+        var last = HotspotStartResult.FAILED
         for (releaseStation in hotspotEnableAttempts(stationEnabled = wifi.isWifiEnabled)) {
             if (releaseStation) wifi.isWifiEnabled = false
-            if (enableAccessPoint(setAp, wifi) && awaitEnabled(timeoutMillis)) return null
+            when (enableAccessPoint(setAp, wifi)) {
+                null -> last = HotspotStartResult.PERMISSION_REQUIRED
+                false -> last = HotspotStartResult.FAILED
+                true -> last = if (awaitEnabled(timeoutMillis)) {
+                    return HotspotStartResult.READY
+                } else {
+                    HotspotStartResult.TIMED_OUT
+                }
+            }
         }
-        return "this firmware refused to switch the hotspot on, or did not report it in time"
+        return last
     }
 
     /**
      * Passes a null configuration on purpose: it keeps whatever the car already has, where building
      * one would rewrite the head unit's own hotspot settings behind the driver's back.
+     *
+     * Returns null when the firmware refused the permission, which is the usual failure and worth
+     * separating from a car that accepted the call but did not switch its hotspot on.
      */
-    private fun enableAccessPoint(setAp: Method, wifi: WifiManager): Boolean = try {
+    private fun enableAccessPoint(setAp: Method, wifi: WifiManager): Boolean? = try {
         setAp.invoke(wifi, null, true) as Boolean
     } catch (error: ReflectiveOperationException) {
-        Log.w(TAG, "The hotspot API rejected the call", error)
-        false
+        deniedOrFailed(error)
+    } catch (error: SecurityException) {
+        deniedOrFailed(error)
     } catch (error: RuntimeException) {
-        // A SecurityException here means the firmware gates the permission, which is the usual case.
-        Log.w(TAG, "The hotspot API rejected the call", error)
-        false
+        deniedOrFailed(error)
+    }
+
+    /** A SecurityException, direct or inside the InvocationTargetException, is the firmware gating us. */
+    private fun deniedOrFailed(error: Exception): Boolean? {
+        val denied = error is SecurityException || error.cause is SecurityException
+        Log.w(
+            TAG,
+            if (denied) "the firmware refused the hotspot permission"
+            else "the hotspot API rejected the call",
+            error,
+        )
+        return if (denied) null else false
     }
 
     private fun awaitEnabled(timeoutMillis: Long): Boolean {
