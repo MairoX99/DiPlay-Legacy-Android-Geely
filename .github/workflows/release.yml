@@ -26,7 +26,6 @@ jobs:
     timeout-minutes: 10
     outputs:
       tag: ${{ steps.derive.outputs.tag }}
-      apk: ${{ steps.derive.outputs.apk }}
       notes: ${{ steps.derive.outputs.notes }}
       skip: ${{ steps.derive.outputs.skip }}
     steps:
@@ -43,14 +42,12 @@ jobs:
           [ -n "$version_name" ] || {
             echo "::error::cannot read versionName from mobile/build.gradle.kts"; exit 1; }
           tag="v$version_name"
-          apk="DiPlay-Legacy-Geely-V$(printf '%s' "$version_name" | tr -d '.')"
           notes="docs/release-notes/$tag.md"
           {
             echo "tag=$tag"
-            echo "apk=$apk"
             echo "notes=$notes"
           } >> "$GITHUB_OUTPUT"
-          echo "versionName $version_name -> tag $tag, artifact $apk"
+          echo "versionName $version_name -> tag $tag"
 
           if [ "$DRY_RUN" = "true" ]; then
             echo "Dry run: the build runs, the Release step does not."
@@ -121,9 +118,23 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: sh scripts/package-geely.sh release
 
+      # The packaging script owns the file name; locate what it actually wrote rather
+      # than re-deriving it here, so the two can never drift apart.
+      - name: Locate the built APK
+        id: artifact
+        run: |
+          set -euo pipefail
+          dist="${{ runner.temp }}/dist"
+          apk=$(ls "$dist"/*.apk)
+          [ "$(printf '%s\n' "$apk" | wc -l)" -eq 1 ] || {
+            echo "::error::expected exactly one APK in $dist, found: $apk"; exit 1; }
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$apk" .apk)" >> "$GITHUB_OUTPUT"
+          echo "Built $(basename "$apk")"
+
       - name: Verify the APK before it can be published
         env:
-          APK: ${{ runner.temp }}/dist/${{ needs.version.outputs.apk }}.apk
+          APK: ${{ steps.artifact.outputs.path }}
         run: |
           set -euo pipefail
           fail() { echo "::error::$1"; exit 1; }
@@ -143,7 +154,7 @@ jobs:
 
       - name: Checksums
         env:
-          APK: ${{ runner.temp }}/dist/${{ needs.version.outputs.apk }}.apk
+          APK: ${{ steps.artifact.outputs.path }}
         run: |
           set -euo pipefail
           cd "$(dirname "$APK")"
@@ -159,16 +170,16 @@ jobs:
           gh release create "${{ needs.version.outputs.tag }}" \
             --title "DiPlay Geely E01 ${{ needs.version.outputs.tag }}" \
             --notes-file "${{ needs.version.outputs.notes }}" \
-            "${{ runner.temp }}/dist/${{ needs.version.outputs.apk }}.apk" \
+            "${{ steps.artifact.outputs.path }}" \
             "${{ runner.temp }}/dist/SHA256SUMS.txt"
 
       - name: Upload the APK as an artifact instead
         if: inputs.dry_run == true
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ needs.version.outputs.apk }}
+          name: ${{ steps.artifact.outputs.name }}
           path: |
-            ${{ runner.temp }}/dist/*.apk
+            ${{ steps.artifact.outputs.path }}
             ${{ runner.temp }}/dist/SHA256SUMS.txt
 
       - name: Remove materialized credentials
