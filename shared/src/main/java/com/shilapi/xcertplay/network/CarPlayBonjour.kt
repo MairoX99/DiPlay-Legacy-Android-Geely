@@ -134,6 +134,14 @@ class CarPlayBonjour(
     private val seenServices = ConcurrentHashMap.newKeySet<String>()
     private val lifecycleLock = Any()
     private val localAdvertisedAddress = advertisedHostAddress()
+    @Volatile
+    private var publishedFamilies = "none"
+    private val addedCount = AtomicInteger()
+    private val resolvedCount = AtomicInteger()
+    private val addressMismatchCount = AtomicInteger()
+    private val probeCount = AtomicInteger()
+    private val successfulProbeCount = AtomicInteger()
+    private val lastProbe = AtomicReference("not_started")
     private val multicastLock = (context.applicationContext ?: context)
         .getSystemService(Context.WIFI_SERVICE).let { it as WifiManager }
         .createMulticastLock("carplay-bonjour").apply { setReferenceCounted(false) }
@@ -229,6 +237,13 @@ class CarPlayBonjour(
     }
 
     /** Starts publication and discovery. Calling this more than once is harmless. */
+    /** Includes zero counts so a silent discovery interval is visible in exported reports. */
+    fun diagnosticSnapshot(): String =
+        "bonjourAdded=${addedCount.get()} bonjourResolved=${resolvedCount.get()} " +
+            "bonjourAddressMismatch=${addressMismatchCount.get()} connectProbes=${probeCount.get()} " +
+            "connectProbe2xx=${successfulProbeCount.get()} lastProbe=${lastProbe.get()} " +
+            "mdnsFamilies=$publishedFamilies"
+
     fun start() {
         synchronized(lifecycleLock) {
             check(!closed) { "CarPlayBonjour is closed" }
@@ -247,6 +262,7 @@ class CarPlayBonjour(
                         "$AIRPLAY_SERVICE_TYPE.local.", config.deviceName, config.port,
                         0, 0, CarPlayBonjourProtocol.airPlayTxtRecords(config, identity),
                     ))
+                    publishedFamilies = if (address is Inet4Address) "IPv4" else "IPv6"
                 } else {
                     registerAirPlay()
                     registrationRequested = true
@@ -275,6 +291,7 @@ class CarPlayBonjour(
                 worker = null
                 runCatching { interfaceMdns?.close() }
                 interfaceMdns = null
+                publishedFamilies = "none"
                 if (multicastLock.isHeld) multicastLock.release()
                 throw error
             }
@@ -305,6 +322,7 @@ class CarPlayBonjour(
             workerToJoin = worker
             worker = null
             workerToJoin?.interrupt()
+            publishedFamilies = "none"
             if (multicastLock.isHeld) multicastLock.release()
         }
         runCatching { dnsToClose?.close() }
@@ -547,6 +565,24 @@ class CarPlayBonjour(
 
     private fun emit(event: CarPlayBonjourEvent) {
         if (closed) return
+        when (event) {
+            is CarPlayBonjourEvent.Discovery -> when (event.stage) {
+                CarPlayBonjourEvent.Discovery.Stage.ADDED -> addedCount.incrementAndGet()
+                CarPlayBonjourEvent.Discovery.Stage.NO_MATCHING_ADDRESS -> addressMismatchCount.incrementAndGet()
+                else -> Unit
+            }
+            is CarPlayBonjourEvent.Resolved -> resolvedCount.incrementAndGet()
+            is CarPlayBonjourEvent.Probed -> {
+                probeCount.addAndGet(event.attempts)
+                val status = event.statusLine
+                    ?.let { Regex("^HTTP/\\d(?:\\.\\d)? (\\d{3})(?: |$)").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                if (status != null && status in 200..299) successfulProbeCount.incrementAndGet()
+                lastProbe.set(
+                    if (event.error != null) "failed_${event.error.javaClass.simpleName}"
+                    else "status_${status ?: "unknown"}",
+                )
+            }
+        }
         try {
             onEvent(event)
         } catch (error: RuntimeException) {

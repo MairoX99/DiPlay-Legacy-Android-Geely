@@ -1,106 +1,139 @@
-﻿# DiPlay Legacy Android
+# DiPlay — Geely E01
 
-> This project is modified from [shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay), with a focus on compatibility with older Android versions and legacy Android-based head units.
+CarPlay for the **Geely Xingrui (吉利星瑞) 2021 E01** head unit — an ECARX E01
+(MediaTek MT6735) unit running GKUI 19 on **Android 5.1 (API 22)**.
 
-> Upstream project: https://github.com/shihabal3amri/DiPlay
+This is a fork of [programmerguohuajing/DiPlay-Legacy-Android](https://github.com/programmerguohuajing/DiPlay-Legacy-Android),
+which is itself a fork of [shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay).
+Everything described here is either Geely-specific work or brand-neutral work ported from upstream.
+**Upstream's BYD-specific features are out of scope for this fork and are not documented here.**
 
-**CarPlay for compatible BYD Android head units.** Wired and wireless, with the familiar DiAuto interface. Independent app: `com.shihab.diplay`.
+**Version:** `0.2.9.1-geely-rc` (versionCode 29) · App id `com.shihab.diplay`
 
-> **BYD support scope:** These projects focus on BYD cars. They may work on other brands, but other brands are unsupported and there are no plans to add support or fix brand-specific incompatibilities.
+## Verified on the car
 
-> **This fork** (`MairoX99/DiPlay-Legacy-Android-Geely`) adds Geely support on top of that. Geely cars run GKUI on ECARX head units, which behave differently from BYD's DiLink. Everything BYD-specific is unchanged and still present.
-
-## Geely compatibility (this fork)
-
-| Compatibility work | What it does |
+| | |
 |---|---|
-| **Geely steering-wheel keys** | A Geely wheel does not arrive as a standard `ACTION_MEDIA_BUTTON` broadcast, so it looked dead no matter what priority DiPlay registered at — and the car's window manager can keep the press for itself. DiPlay now tries two independent paths and logs which one works. The generic one is an accessibility service that filters key events, reaching the wheel before the car can keep it and needing no vendor SDK at all; switch it on in the car's accessibility settings. The other asks the head unit's own input service (`com.ecarx.xui.adaptapi.input`) to hand the wheel over, retrying six times, five seconds apart. Both recognise the vendor key codes these wheels send — `200085`/`200087`/`200088`/`200231` plus the `110000`/`210000` seek pairs, all offset from the standard Android codes. If neither works, the media session handles keys exactly as before. |
-| **Car hotspot** | The "car hotspot" link used to only check whether the head unit's own hotspot was on and tell the driver to switch it on in the car settings. DiPlay now switches it on itself through the platform's `setWifiApEnabled`, keeping the car's existing hotspot configuration, and releases Wi-Fi station mode only if the first attempt fails — that disconnects the head unit from whatever network it is on. When it does not come on, the message says which failure it was: the firmware withholding the permission (the usual case, and one many grant only over ADB), the car refusing the request, or the hotspot not reporting itself enabled in time. |
-| **Android 5 settings page** | The settings switches no longer render their on/off captions, which Android 5 laid out incorrectly. |
+| **Steering-wheel next / previous track** | ✅ **Works on the car.** `DiPlay-MediaKeys: media key -> CarPlay 4/5 sent=true` |
+| **Geely wheel has no play/pause key** | The position is the head unit's own screen-mirroring (飞屏) button. It is routed only through the vendor AIDL layer to `PopView` and never enters the Android key pipeline, so no app can reach it. |
+
+The wheel was the hard part, and the fix that mattered was **not** what upstream does. On this head
+unit the wheel goes through the car's own input service, which re-emits each press as a standard
+`ACTION_MEDIA_BUTTON`. DiPlay's media session declared `flags=0` and had no media-button receiver, so
+the framework handed every press to whichever app held the wheel before. Declaring
+`FLAG_HANDLES_MEDIA_BUTTONS` plus a media-button receiver fixed it — `dumpsys media_session` went
+from `flags=0 / mediaButtonReceiver=null` to `flags=3 / PendingIntent{...}`.
+
+The generic accessibility filter and the ECARX vendor key codes upstream built are **still in the
+tree as fallbacks for other head units**. Neither was needed here: GKUI 19 does not expose an
+accessibility settings entry on this car, so that path cannot be switched on without ADB.
+
+Not yet verified on a car: USB permission auto-confirm, the diagnostic-export fallback, and the
+wireless startup diagnostics.
+
+## What this fork adds
+
+| | |
+|---|---|
+| **Geely steering-wheel keys** | See above. Media session flags + receiver; the accessibility filter and ECARX key codes stay as fallbacks. |
+| **Car hotspot** | DiPlay now switches the head unit's own hotspot on through `setWifiApEnabled`, keeping the car's existing hotspot configuration, instead of telling the driver to go and enable it. Station mode is released only on a retry, since that disconnects the car from whatever network it is on. Failures are reported by kind: firmware withholding the permission, the car refusing, or the hotspot not reporting itself enabled in time. |
+| **Wireless startup diagnostics** | When a wireless connection stalls, the report now says **which step it stalled at**, plus interface state, Bonjour discovery counters and kernel receive/UDP counters. Observation only — it does not change connection deadlines, address selection or retry behaviour. |
+| **USB attach filter** | Added the Apple vendor id; plugging in an iPhone cold no longer fails to launch DiPlay. |
+| **USB permission auto-confirm** | Removes the system's USB authorisation prompt. It answers only the system dialog, never on behalf of another app. |
+| **USBMUX framing** | Tolerates the 4-byte padding after a control reply, which used to abort the connection with a protocol error. |
+| **Audio** | UDP receive buffer raised to 512 KB, plus a stall timeline (largest inter-arrival gap, sequence gaps). |
+| **Touch latency** | Nagle's algorithm disabled on the touch event channel, so gestures no longer arrive in batches. |
+| **Diagnostic export** | Falls back three ways on head units with no file picker, and can show the report on screen for copy-by-long-press. |
+| **Android 5 settings page** | Switches no longer render their on/off captions, which Android 5 laid out incorrectly. |
 | **Wired connection crash** | The runtime config required a manual hotspot SSID whenever manual hotspot mode was configured, wired or not, which aborted wired bring-up. It now applies to wireless only. |
+| **BYD code gated off** | The SOME/IP HUD bridge now checks its gateway is installed before binding, so a Geely head unit no longer retries a service it can never reach — that retry used to run every 300 ms. |
 
-### Upstream alignment
+## Install
 
-This fork's code base is the Legacy snapshot of upstream DiPlay **v0.2.7**. Upstream has since
-reached **v0.2.12 plus unreleased work** — 464 commits in six feature groups. Aligning with it is a
-staged program, not a merge: the two share no history, and upstream targets Android 9 while this
-fork keeps an Android 4.4 (API 19) floor, so every ported piece has to be checked against the older
-platform. The reference car — a Geely Xingrui E01 running GKUI 19 — is itself **Android 5.1
-(API 22)**, so the floor is a floor, not the target.
+Install on the **car**, not the iPhone. No jailbreak, dongle or Mac is required.
+
+⚠️ **This APK is signed with a different key from upstream's, so it cannot be installed over it.**
+Uninstall first:
+
+```sh
+adb uninstall com.shihab.diplay
+adb install -r DiPlay-Legacy-Geely-V0291.apk
+```
+
+Uninstalling loses the app's settings (resolution, audio buffer, wheel-key roles, saved Wi-Fi
+credentials). Without ADB, copy the APK to a USB stick and install it from the head unit's file
+manager with "unknown sources" allowed.
+
+The head unit must permit APK installation.
+
+## Platform notes
+
+The reference car is **Android 5.1 / API 22**, not 4.4 — measured, not assumed
+(`ro.build.version.release=5.1`, `ro.build.version.sdk=22`). This fork keeps an
+**API 19 floor** so it still builds for older head units, but 5.1 is the target, and every ported
+piece is checked against both.
+
+E01 is memory-starved: `MemFree` sits at **26–33 MB**, with `AnonPages` around 1.05 GB. That is the
+binding constraint on what is worth porting, not the API level alone.
+
+## Upstream alignment
+
+This fork's base is upstream DiPlay **v0.2.7**. Upstream has since reached **v0.2.12 plus unreleased
+work** — 464 commits across six feature groups. Aligning is a staged program, not a merge: the two
+share no history, and upstream targets Android 9 (minSdk 28) while this fork keeps an API 19 floor,
+so every ported piece has to be checked against the older platform.
 
 | Feature group | State |
 |---|---|
-| **Steering-wheel keys** | **Done, and verified on the car.** The wheel goes through the head unit's own input service, which re-emits each press as a standard `ACTION_MEDIA_BUTTON`. The fix that mattered was the media session: it now declares `FLAG_HANDLES_MEDIA_BUTTONS` and a media-button receiver, so the framework picks DiPlay instead of whichever app held the wheel before. The generic accessibility filter and the ECARX key codes stay as fallbacks for other head units — neither was needed here. The map zoom and joystick upstream built on the same service drive a BYD dashboard this car does not have. |
-| **Wireless connection** | **Partly aligned.** Switching the car hotspot on, and reporting why it failed, is in. Existing Wi-Fi / Same LAN, Wi-Fi Direct group recovery, preferred-channel selection and the hotspot-join state machine are not. |
-| **Wired / USB** | Not started. |
-| **Protocol and audio** | Not started. |
+| **Steering-wheel keys** | **Done, verified on the car.** See above. Upstream's map zoom and joystick on the same service drive a BYD dashboard this car does not have. |
+| **Wireless connection** | **Partly aligned.** Car hotspot takeover, and the wireless startup diagnostics, are in. Same LAN / existing Wi-Fi is not yet ported but is feasible here. Wi-Fi Direct group recovery and preferred-channel selection are **not planned**: upstream marks them `@RequiresApi(Q)` (API 29) and this car is API 22. |
+| **Wired / USB** | Partly aligned — attach filter, USBMUX framing, permission auto-confirm. |
+| **Protocol and audio** | Partly aligned — UDP receive buffer and stall diagnostics. Buffered audio is **not planned** (see below). |
 | **Interface and settings** | Not started. |
 | **Stability fixes** | Not started. |
 
-Features that depend on BYD hardware — the DiLink 3/4/5 cluster projection, BYD HUD navigation, CAN
-battery reporting — have no counterpart on a Geely head unit. They are **out of scope rather than
-outstanding**, and are not planned. The code stays in the tree so upstream syncs stay cheap, but the
-SOME/IP HUD bridge now checks that its gateway is installed before binding, so a head unit without
-one no longer retries a service it can never reach (that retry used to run every 300 ms).
+Deliberately out of scope:
 
-**Status:** steering-wheel track skip is **verified on the car** — a Geely Xingrui E01 on Android 5.1
-sends next and previous track through to CarPlay. That wheel has no play/pause key; the position is
-the head unit's own screen-mirroring button, which never enters the Android key pipeline and so is
-not reachable by any app. Every other ported piece is still unverified on a car, and each degrades to
-the previous behaviour on a head unit that offers neither path, so non-Geely cars are unaffected.
-Check `DiPlay-MediaKeys` for each key forwarded to CarPlay, `DiPlay-WheelKeys` for whether the
-accessibility filter was switched on and what it saw, and `DiPlay-EcarxKeys` for whether the ECARX
-input service was found and what it granted.
-
-[Download & website](https://shihabal3amri.github.io/DiPlay/) · [Release](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.7) · [Report a problem](https://github.com/shihabal3amri/DiPlay/issues/new/choose)
-
-![DiPlay home](site/assets/home.png)
-
-## 0.2.7 — public preview
-
-Install on the **car**, not the iPhone. No jailbreak, dongle, Mac, account or authentication server is required for use. Core CarPlay does not require ADB; the optional dashboard-mode and battery features do. Your head unit must permit APK installation. The mobile APK now supports Android 4.4+ (API 19) for the classic UI and wired transport. Android 4.4–7 use a manually configured car hotspot for wireless mode, Android 8+ may use LocalOnlyHotspot, and Wi-Fi Direct remains available on Android 10+.
-
-- Wired USB and wireless CarPlay with local authentication.
-- BYD HUD navigation with arrows, distance and street names on verified firmware.
-- Car hotspot support, improved audio buffering and saved receive diagnostics.
-- Automatic address discovery, fixed-channel Wi-Fi fallbacks and successful-configuration memory.
-- Icon/text size, resolution and frame rate; applying a display change reconnects CarPlay.
-- Local diagnostic export. Reports are sent only if you choose to share them.
-- Separate installation alongside DiAuto. Run one projection app at a time.
-- Legacy Android fallbacks for media keys, notification/services, USB configuration and requests, audio/video codecs, multidex and Java library APIs.
-
-This is **not an Apple-certified product**. The APK bundles an experimental accessory identity recovered from public Carlinkit firmware, not a newly provisioned MFi identity for DiPlay. A bundled private key is extractable. Acceptance after future iOS updates, reliability across head units and suitability of that identity for general distribution are unresolved. This release invites community testing; it is not a guarantee of universal compatibility.
-
-Earlier releases were tested on the development DiLink5.1 car: live windshield guidance and street names work, Car hotspot now starts CarPlay, and Wi-Fi Direct performance is substantially improved. Occasional audio cutouts remain and are deferred to a later update. The newly packaged 0.2.7 APK has not had a separate on-car test. Broader head-unit and iOS compatibility is not guaranteed. The HUD firmware scope and cleanup limits are documented in [BYD navigation](docs/BYD_NAVIGATION.md).
-
-## What’s new in 0.2.7
-
-- App interface in English, Simplified Chinese, Arabic, Russian and Spanish; synchronized Android app-language settings.
-- Steering-wheel media controls and long-press Siri on supported BYD firmware while CarPlay is on screen.
-- Dashboard display choices: map, turn card, or both; corrected dashboard keyframe recovery.
-- Optional ADB feature on supported DiLink 5.0: pause the dashboard map stream when its display mode hides the map.
-- Optional ADB battery reporting for Apple Maps, with warning threshold, charging-connector selection and a checked reconnect action.
-- Audio playback reliability fixes and clearer dashboard settings.
+- **BYD hardware** — DiLink 3/4/5 cluster projection, BYD HUD navigation, CAN battery reporting.
+  This head unit has no counterpart. The code stays in the tree so upstream syncs stay cheap.
+- **Buffered audio** (`BufferedAudioStream`) — a large new subsystem whose whole point is trading
+  memory for smoothness. On a unit with 26–33 MB free that is the wrong trade, and upstream ships it
+  disabled by default.
+- **Android multi-window / split screen** — GKUI has no split screen, so CarPlay is always full
+  screen here. (CarPlay *view areas* are an iAP2 protocol feature and would work; the head unit just
+  never gives DiPlay a smaller window to use them for.)
 
 ## Documentation
 
+- [Release notes](CHANGELOG.md)
+- [Build from source](docs/BUILD.md)
 - [Install and connect](docs/INSTALL.md)
 - [Compatibility and troubleshooting](docs/COMPATIBILITY.md)
 - [Privacy and diagnostic reports](docs/PRIVACY.md)
-- [Build from source](docs/BUILD.md)
 - [Validation](docs/VALIDATION.md)
-- [Release notes](CHANGELOG.md)
 - [Credits and licenses](docs/THIRD_PARTY_NOTICES.md)
-
-The website is available in English, Arabic, Russian, Spanish and Simplified Chinese. The app interface supports those same five languages. Choose the app language in Settings; on Android 13+, it stays synchronized with Android’s per-app language setting.
 
 ## Source and credits
 
-Based on [xcertplay](https://github.com/shilapi/xcertplay), GPL-3.0. The home/settings UI and website adapt [DiAuto](https://github.com/shihabal3amri/DiAuto), AGPL-3.0; that license is included in `docs/licenses`. Preserve those notices when distributing modifications. CarPlay and its icon belong to Apple Inc.; no Apple or BYD affiliation or endorsement is implied.
+Based on [xcertplay](https://github.com/shilapi/xcertplay), GPL-3.0. The home/settings UI and website
+adapt [DiAuto](https://github.com/shihabal3amri/DiAuto), AGPL-3.0; that license is included in
+`docs/licenses`. Preserve those notices when distributing modifications. CarPlay and its icon belong
+to Apple Inc.; no Apple, Geely or ECARX affiliation or endorsement is implied.
 
-This repository starts with a clean public source snapshot. Local research, tester reports and release-signing secrets are excluded. The complete source corresponding to the APK is provided with every release; experimental runtime identity assets are described separately in the build instructions and notices.
+This repository starts with a clean public source snapshot. Local research, tester reports and
+release-signing secrets are excluded. The complete source corresponding to the APK is provided with
+every release; experimental runtime identity assets are described separately in the build
+instructions and notices.
+
+This is **not an Apple-certified product**. The APK bundles an experimental accessory identity
+recovered from public Carlinkit firmware, not a newly provisioned MFi identity. A bundled private key
+is extractable. Acceptance after future iOS updates, reliability across head units and suitability of
+that identity for general distribution are unresolved.
 
 ## Local release packaging
 
-The release APK intentionally contains the experimental accessory identity. The Git repository and source archive exclude all accessory and Android signing keys; tests generate synthetic identities at runtime. Source/CI builds omit runtime identity assets by default. Local release builds explicitly select an external asset directory. Publishing the APK makes its bundled identity extractable; building locally does not preserve that identity's confidentiality.
-
+The release APK intentionally contains the experimental accessory identity. The Git repository and
+source archive exclude all accessory and Android signing keys; tests generate synthetic identities at
+runtime. Source/CI builds omit runtime identity assets by default. Local release builds explicitly
+select an external asset directory. Publishing the APK makes its bundled identity extractable;
+building locally does not preserve that identity's confidentiality.
