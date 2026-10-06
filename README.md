@@ -19,6 +19,26 @@
 | **Android 5 settings page** | The settings switches no longer render their on/off captions, which Android 5 laid out incorrectly. |
 | **Wired connection crash** | The runtime config required a manual hotspot SSID whenever manual hotspot mode was configured, wired or not, which aborted wired bring-up. It now applies to wireless only. |
 
+### Upstream alignment
+
+This fork's code base is the Legacy snapshot of upstream DiPlay **v0.2.7**. Upstream has since
+reached **v0.2.12 plus unreleased work** — 464 commits in six feature groups. Aligning with it is a
+staged program, not a merge: the two share no history, and upstream targets Android 9 while this
+fork targets Android 4.4, so every ported piece has to be checked against the older platform.
+
+| Feature group | State |
+|---|---|
+| **Steering-wheel keys** | **Partly aligned.** The generic accessibility filter is in, and so are the ECARX key codes. The map zoom and joystick upstream built on top of the same service drive a BYD dashboard this car does not have. |
+| **Wireless connection** | **Partly aligned.** Switching the car hotspot on, and reporting why it failed, is in. Existing Wi-Fi / Same LAN, Wi-Fi Direct group recovery, preferred-channel selection and the hotspot-join state machine are not. |
+| **Wired / USB** | Not started. |
+| **Protocol and audio** | Not started. |
+| **Interface and settings** | Not started. |
+| **Stability fixes** | Not started. |
+
+Features that depend on BYD hardware — the DiLink 3/4/5 cluster projection, BYD HUD navigation, CAN
+battery reporting — have no counterpart on a Geely head unit. They are **out of scope rather than
+outstanding**, and are not planned.
+
 **Status:** both steering-wheel paths are new and have not been verified on a car. They degrade to the previous behaviour on a head unit that offers neither, so non-Geely cars are unaffected. Check `DiPlay-WheelKeys` for whether the accessibility filter was switched on and what it saw, `DiPlay-EcarxKeys` for whether the ECARX input service was found and what it granted, and `DiPlay-MediaKeys` for each key forwarded to CarPlay.
 
 [Download & website](https://shihabal3amri.github.io/DiPlay/) · [Release](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.7) · [Report a problem](https://github.com/shihabal3amri/DiPlay/issues/new/choose)
