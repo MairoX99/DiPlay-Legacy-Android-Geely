@@ -437,4 +437,6 @@
     <string name="adb_battery_reading">Батарея: %1$d %%, %2$d км.</string>
     <string name="adb_battery_unreadable">Батарею этой машины прочитать не удалось, поэтому iPhone не узнаёт об электромобиле.</string>
     <string name="adb_battery_reconnect">Если CarPlay подключился до получения данных батареи, нажмите «Применить и переподключить», чтобы включить передачу данных батареи.</string>
+    <string name="wheel_key_service_label">Кнопки руля DiPlay</string>
+    <string name="wheel_key_service_description">Позволяет DiPlay перехватывать медиакнопки руля для CarPlay. Без этого головное устройство может оставить эти нажатия себе — именно поэтому руль не реагирует, пока на экране CarPlay. Громкость и все остальные кнопки работают как обычно.</string>
 </resources>

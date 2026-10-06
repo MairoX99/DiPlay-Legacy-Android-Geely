@@ -437,4 +437,6 @@
     <string name="adb_battery_reading">Batería: %1$d %%, %2$d km.</string>
     <string name="adb_battery_unreadable">No se puede leer la batería de este coche, así que el iPhone no sabe que es un coche eléctrico.</string>
     <string name="adb_battery_reconnect">Si CarPlay se conectó antes de que la batería estuviera lista, usa Aplicar y reconectar para activar el envío de los datos de la batería.</string>
+    <string name="wheel_key_service_label">Teclas del volante de DiPlay</string>
+    <string name="wheel_key_service_description">Permite que DiPlay se haga cargo de las teclas multimedia del volante para CarPlay. Sin esto, el coche puede quedarse con esas pulsaciones, y por eso el volante no responde mientras CarPlay está en pantalla. El volumen y el resto de las teclas no se ven afectados.</string>
 </resources>
