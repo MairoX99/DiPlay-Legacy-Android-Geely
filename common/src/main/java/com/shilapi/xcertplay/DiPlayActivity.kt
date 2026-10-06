@@ -894,11 +894,8 @@ class DiPlayActivity : ComponentActivity() {
     private fun chooseReportDestination() {
         // Some head units omit or disable DocumentsUI. Launch itself can throw, before
         // the result callback and the background writer's exception handler ever run.
-        runCatching { export.launch(reportFileName()) }.onFailure {
-            toast(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-                getString(R.string.this_head_unit_could_not_open_a_save_location_please_try_s)
-                else getString(R.string.this_head_unit_has_no_available_file_picker_to_save_the_re))
-        }
+        if (exportInProgress) return
+        runCatching { export.launch(reportFileName()) }.onFailure { exportDiagnostics() }
     }
 
     private fun exportDiagnostics(uri: Uri? = null) {
@@ -933,28 +930,35 @@ class DiPlayActivity : ComponentActivity() {
                         }
                     }
                 }
-                if (uri != null) { DiagnosticExportStore.write(appContext.contentResolver, uri, report); uri }
-                else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    DiagnosticExportStore.saveToDownloads(appContext.contentResolver, fileName, report)
-                } else error("A save location is required")
+                val savedReport = if (uri != null) {
+                    DiagnosticExportStore.write(appContext.contentResolver, uri, report)
+                    DiagnosticExportStore.SavedReport(uri)
+                } else DiagnosticExportStore.saveWithoutPicker(appContext, fileName, report)
+                savedReport to report
             }
             runOnUiThread {
                 exportInProgress = false
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 exportButton?.apply { isEnabled = true; text = getString(R.string.save_diagnostic_report) }
                 if (result.isSuccess) {
-                    val savedUri = result.getOrThrow()
+                    val (savedReport, report) = result.getOrThrow()
                     AlertDialog.Builder(this).setTitle(getString(R.string.diagnostic_report_saved))
-                        .setMessage(if (uri == null) "Downloads/DiPlay/$fileName" else getString(R.string.your_report_was_saved_to_the_selected_location))
-                        .setPositiveButton(getString(R.string.done), null)
+                        .setMessage(when {
+                            savedReport.savedInApp -> getString(R.string.diagnostic_report_saved_in_app)
+                            savedReport.savedPath != null -> getString(R.string.diagnostic_report_saved_to_path, savedReport.savedPath)
+                            uri == null -> "Downloads/DiPlay/$fileName"
+                            else -> getString(R.string.your_report_was_saved_to_the_selected_location)
+                        })
+                        .setPositiveButton(getString(R.string.view_diagnostic_report)) { _, _ -> showDiagnosticReport(report) }
+                        .setNegativeButton(getString(R.string.done), null)
                         .setNeutralButton(getString(R.string.share)) { _, _ ->
                             runCatching {
                                 startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"; putExtra(Intent.EXTRA_STREAM, savedUri)
-                                    clipData = android.content.ClipData.newRawUri(getString(R.string.report_clip_label), savedUri)
+                                    type = "text/plain"; putExtra(Intent.EXTRA_STREAM, savedReport.uri)
+                                    clipData = android.content.ClipData.newRawUri(getString(R.string.report_clip_label), savedReport.uri)
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }, getString(R.string.share_diagnostic_report)))
-                            }.onFailure { toast(getString(R.string.report_saved_open_it_from_your_file_manager_to_share_it)) }
+                            }.onFailure { showDiagnosticReport(report) }
                         }.show()
                 } else {
                     AlertDialog.Builder(this).setTitle(getString(R.string.could_not_save_the_report))
@@ -964,6 +968,17 @@ class DiPlayActivity : ComponentActivity() {
                 }
             }
         }, "diplay-export").start()
+    }
+    private fun showDiagnosticReport(report: String) {
+        val body = column().apply { setPadding(dp(24), dp(12), dp(24), dp(12)) }
+        body.addView(label(getString(R.string.diagnostic_report_copy_hint), 14, MUTED))
+        body.addView(label(report, 13, TEXT).apply {
+            typeface = Typeface.MONOSPACE
+            setTextIsSelectable(true)
+        })
+        AlertDialog.Builder(this).setTitle(getString(R.string.view_diagnostic_report))
+            .setView(ScrollView(this).apply { addView(body) })
+            .setPositiveButton(getString(R.string.close), null).show()
     }
     private fun permissionHelp(title: String, body: String) {
         AlertDialog.Builder(this).setTitle(title).setMessage(body).setPositiveButton(getString(R.string.app_settings)) { _, _ ->

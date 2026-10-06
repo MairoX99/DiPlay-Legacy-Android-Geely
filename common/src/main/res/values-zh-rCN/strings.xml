@@ -137,7 +137,7 @@
     <string name="choose_iphone">选择 iPhone</string>
     <string name="choose_location">选择位置</string>
     <string name="choose_save_location">选择保存位置</string>
-    <string name="choose_where_to_save_your_report">选择报告的保存位置。</string>
+    <string name="choose_where_to_save_your_report">选择报告的保存位置。如果文件选择器不可用，DiPlay 会在应用内保存报告。\u0020</string>
     <string name="choose_your_iphone">选择 iPhone</string>
     <string name="close">关闭</string>
     <string name="cluster_map_size">仪表盘地图大小</string>
@@ -451,4 +451,8 @@
     <string name="wheel_key_service_label">DiPlay 方向盘按键</string>
     <string name="wheel_key_service_description">让 DiPlay 为 CarPlay 接管方向盘的媒体按键。不开启时车机可能会把这些按键留给自己处理，导致 CarPlay 显示时方向盘无反应。音量键及其他按键不受影响。</string>
     <string name="usb_auto_confirm_desc">自动勾选「始终允许」并确认 Android 的 USB 配件授权弹窗，用于 CarPlay</string>
+    <string name="diagnostic_report_saved_in_app">由于公共保存位置不可用，报告已私密保存到 DiPlay。您可以在此分享或查看报告。不会自动发送任何内容。</string>
+    <string name="diagnostic_report_saved_to_path">报告已保存到：\n%1$s\n\n您也可以在此分享或查看报告。不会自动发送任何内容。</string>
+    <string name="view_diagnostic_report">查看报告</string>
+    <string name="diagnostic_report_copy_hint">长按报告文本即可选择并复制。如果没有可用的分享应用，可以使用此方式。</string>
 </resources>

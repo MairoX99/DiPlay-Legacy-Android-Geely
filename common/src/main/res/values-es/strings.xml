@@ -141,7 +141,7 @@
     <string name="choose_iphone">Elegir iPhone</string>
     <string name="choose_location">Elegir ubicación</string>
     <string name="choose_save_location">Elegir lugar de guardado</string>
-    <string name="choose_where_to_save_your_report">Elige dónde guardar tu informe.\u0020</string>
+    <string name="choose_where_to_save_your_report">Elige dónde guardar el informe. Si no hay selector de archivos, DiPlay lo guarda en la aplicación.\u0020</string>
     <string name="choose_your_iphone">Elige tu iPhone</string>
     <string name="close">Cerrar</string>
     <string name="cluster_map_size">Tamaño del mapa del panel de instrumentos</string>
@@ -440,4 +440,8 @@
     <string name="wheel_key_service_label">Teclas del volante de DiPlay</string>
     <string name="wheel_key_service_description">Permite que DiPlay se haga cargo de las teclas multimedia del volante para CarPlay. Sin esto, el coche puede quedarse con esas pulsaciones, y por eso el volante no responde mientras CarPlay está en pantalla. El volumen y el resto de las teclas no se ven afectados.</string>
     <string name="usb_auto_confirm_desc">Marca «Permitir siempre» y confirma automáticamente el aviso de permiso de accesorios USB de Android para CarPlay</string>
+    <string name="diagnostic_report_saved_in_app">El informe se guardó de forma privada en DiPlay porque no había una ubicación pública disponible. Compártelo o míralo aquí. No se envía nada automáticamente.</string>
+    <string name="diagnostic_report_saved_to_path">El informe se guardó en:\n%1$s\n\nTambién puedes compartirlo o verlo aquí. No se envía nada automáticamente.</string>
+    <string name="view_diagnostic_report">Ver informe</string>
+    <string name="diagnostic_report_copy_hint">Mantén pulsado el texto del informe para seleccionarlo y copiarlo. Puedes usar esta opción si no hay una aplicación para compartir.</string>
 </resources>

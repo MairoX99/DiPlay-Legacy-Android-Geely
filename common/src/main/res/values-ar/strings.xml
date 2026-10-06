@@ -141,7 +141,7 @@
     <string name="choose_iphone">اختر iPhone</string>
     <string name="choose_location">اختر الموضع</string>
     <string name="choose_save_location">اختر موضع الحفظ</string>
-    <string name="choose_where_to_save_your_report">اختر أين تحفظ تقريرك.\u0020</string>
+    <string name="choose_where_to_save_your_report">اختر مكان حفظ التقرير. إذا لم يتوفر منتقي ملفات، يحفظه DiPlay داخل التطبيق.\u0020</string>
     <string name="choose_your_iphone">اختر iPhone الخاص بك</string>
     <string name="close">إغلاق</string>
     <string name="cluster_map_size">حجم خريطة لوحة العدادات</string>
@@ -440,4 +440,8 @@
     <string name="wheel_key_service_label">مفاتيح المقود في DiPlay</string>
     <string name="wheel_key_service_description">يسمح لـ DiPlay بالتقاط مفاتيح الوسائط في المقود لصالح CarPlay. بدون ذلك قد تحتفظ السيارة بهذه الضغطات لنفسها، ولهذا لا يستجيب المقود أثناء عرض CarPlay. لا يتأثر مفتاح الصوت ولا أي مفتاح آخر.</string>
     <string name="usb_auto_confirm_desc">يحدّد «السماح دائمًا» تلقائيًا ويؤكّد نافذة إذن ملحقات USB في Android لـ CarPlay</string>
+    <string name="diagnostic_report_saved_in_app">تم حفظ التقرير بشكل خاص داخل DiPlay لعدم توفر موقع حفظ عام. يمكنك مشاركته أو عرضه هنا. لا يتم إرسال شيء تلقائياً.</string>
+    <string name="diagnostic_report_saved_to_path">تم حفظ التقرير في:\n%1$s\n\nيمكنك أيضاً مشاركته أو عرضه هنا. لا يتم إرسال شيء تلقائياً.</string>
+    <string name="view_diagnostic_report">عرض التقرير</string>
+    <string name="diagnostic_report_copy_hint">المس نص التقرير مطولاً لتحديده ونسخه. يمكنك استخدام ذلك إذا لم يتوفر تطبيق للمشاركة.</string>
 </resources>

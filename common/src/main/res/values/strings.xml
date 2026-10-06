@@ -143,7 +143,7 @@
     <string name="choose_iphone">Choose iPhone</string>
     <string name="choose_location">Choose location</string>
     <string name="choose_save_location">Choose save location</string>
-    <string name="choose_where_to_save_your_report">Choose where to save your report.\u0020</string>
+    <string name="choose_where_to_save_your_report">Choose where to save your report. If the file picker is unavailable, DiPlay saves it in the app.\u0020</string>
     <string name="choose_your_iphone">Choose your iPhone</string>
     <string name="close">Close</string>
     <string name="cluster_map_size">Dashboard map size</string>
@@ -451,4 +451,8 @@
     <string name="wheel_key_service_label">DiPlay steering wheel keys</string>
     <string name="wheel_key_service_description">Lets DiPlay take the steering wheel\'s media keys for CarPlay. Without it the car may keep those presses for itself, which is why the wheel does nothing while CarPlay is on screen. Volume and every other key are unaffected.</string>
     <string name="usb_auto_confirm_desc">Automatically ticks Always allow and confirms the Android USB accessory prompt for CarPlay</string>
+    <string name="diagnostic_report_saved_in_app">Your report was saved privately in DiPlay because a public save location was unavailable. Share it or view it here. Nothing is sent automatically.</string>
+    <string name="diagnostic_report_saved_to_path">Your report was saved to:\n%1$s\n\nYou can also share it or view it here. Nothing is sent automatically.</string>
+    <string name="view_diagnostic_report">View report</string>
+    <string name="diagnostic_report_copy_hint">Touch and hold the report text to select and copy it. You can use this if no sharing app is available.</string>
 </resources>

@@ -141,7 +141,7 @@
     <string name="choose_iphone">Выбрать iPhone</string>
     <string name="choose_location">Выбрать место</string>
     <string name="choose_save_location">Выбрать место сохранения</string>
-    <string name="choose_where_to_save_your_report">Выберите, куда сохранить отчёт.\u0020</string>
+    <string name="choose_where_to_save_your_report">Выберите место сохранения отчёта. Если средство выбора файлов недоступно, DiPlay сохранит его в приложении.\u0020</string>
     <string name="choose_your_iphone">Выберите свой iPhone</string>
     <string name="close">Закрыть</string>
     <string name="cluster_map_size">Размер карты на приборной панели</string>
@@ -440,4 +440,8 @@
     <string name="wheel_key_service_label">Кнопки руля DiPlay</string>
     <string name="wheel_key_service_description">Позволяет DiPlay перехватывать медиакнопки руля для CarPlay. Без этого головное устройство может оставить эти нажатия себе — именно поэтому руль не реагирует, пока на экране CarPlay. Громкость и все остальные кнопки работают как обычно.</string>
     <string name="usb_auto_confirm_desc">Автоматически ставит «Всегда разрешать» и подтверждает запрос доступа к USB-аксессуару Android для CarPlay</string>
+    <string name="diagnostic_report_saved_in_app">Отчёт сохранён приватно в DiPlay, поскольку общедоступное место сохранения недоступно. Поделитесь им или просмотрите его здесь. Ничего не отправляется автоматически.</string>
+    <string name="diagnostic_report_saved_to_path">Отчёт сохранён в:\n%1$s\n\nВы также можете поделиться им или просмотреть его здесь. Ничего не отправляется автоматически.</string>
+    <string name="view_diagnostic_report">Просмотреть отчёт</string>
+    <string name="diagnostic_report_copy_hint">Нажмите и удерживайте текст отчёта, чтобы выделить и скопировать его. Это можно использовать, если нет приложения для отправки.</string>
 </resources>
