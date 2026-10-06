@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
@@ -35,6 +36,7 @@ internal object BydHudBridge {
     private var context: Context? = null
     private var binder: IBinder? = null
     private var binding = false
+    private var available = false
     private var started = false
     private var senderStarted = false
     private var guidanceSentLogged = false
@@ -72,6 +74,15 @@ internal object BydHudBridge {
 
     fun initialize(appContext: Context) = synchronized(lock) {
         if (context == null) context = appContext.applicationContext
+        available = try {
+            appContext.packageManager.getPackageInfo(SOMEIP_PACKAGE, 0)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
+        Log.i(TAG, "SOME/IP gateway available=$available")
+        // Every bind would fail without the gateway, so the retry loop could only fill the log.
+        if (!available) return@synchronized
         bindLocked()
         if (!senderStarted) {
             senderStarted = true
