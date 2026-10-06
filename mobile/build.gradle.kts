@@ -17,8 +17,8 @@ android {
         minSdk = 19
         targetSdk = 37
         multiDexEnabled = true
-        versionCode = 26
-        versionName = "0.2.7-geely"
+        versionCode = 28
+        versionName = "0.2.9-geely-rc"
 
     }
 
