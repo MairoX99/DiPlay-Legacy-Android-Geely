@@ -34,6 +34,7 @@ import com.shilapi.xcertplay.mfi.MfiAuthenticationClient
 import com.shilapi.xcertplay.mfi.RemoteMfiAuthenticationClient
 import com.shilapi.xcertplay.mfi.LocalMfiAuthenticationClient
 import com.shilapi.xcertplay.network.CarPlayBonjour
+import com.shilapi.xcertplay.network.CarHotspotController
 import com.shilapi.xcertplay.network.diagnosticSummary
 import com.shilapi.xcertplay.network.CarPlayVpnService
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
@@ -1597,10 +1598,15 @@ class CarPlayController(
                 config.wirelessHotspotMode == WirelessHotspotMode.WIFI_P2P -> WirelessHotspotMode.LOCAL_ONLY_HOTSPOT
             else -> config.wirelessHotspotMode
         }
-        if (hotspotMode == WirelessHotspotMode.MANUAL &&
-            com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(appContext) == false
-        ) {
-            throw IOException("The car hotspot is off. Turn it on in the car settings and connect again.")
+        if (hotspotMode == WirelessHotspotMode.MANUAL) {
+            CarHotspotController(appContext)
+                .ensureEnabled(CAR_HOTSPOT_ENABLE_TIMEOUT_MILLIS)
+                ?.let { reason ->
+                    throw IOException(
+                        "The car hotspot is off and DiPlay could not switch it on: $reason. " +
+                            "Turn it on in the car settings and connect again.",
+                    )
+                }
         }
         val manager: WirelessHotspotManager = when (hotspotMode) {
             WirelessHotspotMode.WIFI_P2P -> {
@@ -2050,6 +2056,7 @@ class CarPlayController(
     companion object {
         private const val IAP2_IPHONE_UUID = "00000000-deca-fade-deca-deafdecacafe"
         private const val HOTSPOT_START_TIMEOUT_MILLIS = 60_000L
+        private const val CAR_HOTSPOT_ENABLE_TIMEOUT_MILLIS = 15_000L
         private const val WIFI_P2P_START_TIMEOUT_MILLIS = 20_000L
         private const val PAIR_TIMEOUT_MILLIS = 5 * 60_000L
         private const val VPN_CONNECT_TIMEOUT_MILLIS = 10_000L

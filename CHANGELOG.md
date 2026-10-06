@@ -1,3 +1,20 @@
+# Geely compatibility — unreleased
+
+- Geely (ECARX) steering-wheel media keys. A Geely wheel is not delivered as a standard
+  `ACTION_MEDIA_BUTTON` broadcast, so it never reached DiPlay and no priority change could help.
+  DiPlay now claims the wheel through the head unit's own input service
+  (`com.ecarx.xui.adaptapi.input`), retrying six times five seconds apart, and recognises the vendor
+  key codes these wheels send (`200085`/`200087`/`200088`/`200231`, plus the `110000`/`210000` seek
+  pairs) on whichever path delivers them. Falls back to the media session when the input service is
+  absent, so head units without it behave exactly as before.
+- Switch the car's own hotspot on instead of leaving the driver to do it in the car settings. The
+  head unit's existing hotspot configuration is kept, and Wi-Fi station mode is released only on a
+  retry, since that disconnects the car from whatever network it is on. Falls back to the previous
+  message, now with the reason, when the firmware refuses the permission.
+- Fix the Android 5 settings page: switches no longer render their on/off captions.
+- Fix wired connections being rejected when manual hotspot mode was configured; the check now
+  applies to wireless only.
+
 # DiPlay 0.2.7 — 2026-09-29
 
 - App interface in English, Simplified Chinese, Arabic, Russian and Spanish; synchronized Android app-language settings.

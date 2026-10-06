@@ -8,6 +8,19 @@
 
 > **BYD support scope:** These projects focus on BYD cars. They may work on other brands, but other brands are unsupported and there are no plans to add support or fix brand-specific incompatibilities.
 
+> **This fork** (`MairoX99/DiPlay-Legacy-Android-Geely`) adds Geely support on top of that. Geely cars run GKUI on ECARX head units, which behave differently from BYD's DiLink. Everything BYD-specific is unchanged and still present.
+
+## Geely compatibility (this fork)
+
+| Compatibility work | What it does |
+|---|---|
+| **ECARX steering-wheel keys** | A Geely wheel does not arrive as a standard `ACTION_MEDIA_BUTTON` broadcast, so it looked dead no matter what priority DiPlay registered at. DiPlay now asks the head unit's own input service (`com.ecarx.xui.adaptapi.input`) to hand the wheel over, and separately recognises the vendor key codes these wheels send — `200085`/`200087`/`200088`/`200231` plus the `110000`/`210000` seek pairs, all offset from the standard Android codes. Interception retries six times, five seconds apart, because the service is not always up when CarPlay attaches; if it never grants, the media session handles keys as before. |
+| **Car hotspot** | The "car hotspot" link used to only check whether the head unit's own hotspot was on and tell the driver to switch it on in the car settings. DiPlay now switches it on itself through the platform's `setWifiApEnabled`, keeping the car's existing hotspot configuration, and releases Wi-Fi station mode only if the first attempt fails — that disconnects the head unit from whatever network it is on. When the firmware refuses (a permission many grant only over ADB), the old message is shown together with the reason. |
+| **Android 5 settings page** | The settings switches no longer render their on/off captions, which Android 5 laid out incorrectly. |
+| **Wired connection crash** | The runtime config required a manual hotspot SSID whenever manual hotspot mode was configured, wired or not, which aborted wired bring-up. It now applies to wireless only. |
+
+**Status:** the ECARX steering-wheel path is new and has not been verified on a car. It degrades to the previous behaviour on any head unit without the ECARX input service, so non-Geely cars are unaffected. Check `DiPlay-EcarxKeys` for whether the service was found and what it granted, and `DiPlay-MediaKeys` for each key forwarded to CarPlay.
+
 [Download & website](https://shihabal3amri.github.io/DiPlay/) · [Release](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.7) · [Report a problem](https://github.com/shihabal3amri/DiPlay/issues/new/choose)
 
 ![DiPlay home](site/assets/home.png)

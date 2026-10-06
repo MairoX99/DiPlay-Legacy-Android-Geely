@@ -31,6 +31,20 @@ class CarPlayMediaButtonTest {
     }
 
     @Test
+    fun geelyEcarxKeysMapToTheSamePressesAsTheStandardOnes() {
+        // An ECARX wheel prefixes the standard code: 200000 media, 110000/210000 seek.
+        assertEquals(CarPlayMediaButton.NEXT, CarPlayMediaButton.forKeyCode(200087))
+        assertEquals(CarPlayMediaButton.PREVIOUS, CarPlayMediaButton.forKeyCode(200088))
+        assertEquals(CarPlayMediaButton.PLAY_PAUSE, CarPlayMediaButton.forKeyCode(200085))
+        assertEquals(CarPlayMediaButton.NEXT, CarPlayMediaButton.forKeyCode(110005))
+        assertEquals(CarPlayMediaButton.NEXT, CarPlayMediaButton.forKeyCode(210005))
+        assertEquals(CarPlayMediaButton.PREVIOUS, CarPlayMediaButton.forKeyCode(110006))
+        assertEquals(CarPlayMediaButton.PREVIOUS, CarPlayMediaButton.forKeyCode(210006))
+        assertTrue(CarPlayMediaButton.opensSiri(200231))
+        assertNull(CarPlayMediaButton.forKeyCode(200231))
+    }
+
+    @Test
     fun otherKeysAreLeftToTheSystem() {
         assertNull(CarPlayMediaButton.forKeyCode(KeyEvent.KEYCODE_VOLUME_UP))
         assertNull(CarPlayMediaButton.forKeyCode(KeyEvent.KEYCODE_MEDIA_STOP))

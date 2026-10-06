@@ -22,19 +22,106 @@ import com.shilapi.xcertplay.orchestration.CarPlayController
 /** Steering-wheel media keys with equivalent API 19 and API 21+ backends. */
 internal object CarPlayMediaKeys {
     private const val TAG = "DiPlay-MediaKeys"
+    private const val ECARX_MAX_ATTEMPTS = 6
+    private const val ECARX_RETRY_DELAY_MILLIS = 5_000L
     private val mainHandler = Handler(Looper.getMainLooper())
     private val backend: Backend by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) Api21Backend() else LegacyBackend()
     }
 
-    fun attach(context: Context, controller: CarPlayController) = backend.attach(context, controller)
-    fun detach(expected: CarPlayController?) = backend.detach(expected)
+    fun attach(context: Context, controller: CarPlayController) {
+        backend.attach(context, controller)
+        if (interceptorController !== controller) startInterception(context, controller)
+    }
+
+    fun detach(expected: CarPlayController?) {
+        backend.detach(expected)
+        if (expected == null || interceptorController === expected) stopInterception()
+    }
+
     fun onMediaAudioChanged(active: Boolean) = mainHandler.post { backend.update(active) }
     fun onIphonePlaying(playing: Boolean) {
         if (playing) mainHandler.post { backend.regainFocus() }
     }
 
     internal fun dispatch(event: KeyEvent): Boolean = backend.dispatch(event)
+
+    // A Geely ECARX head unit hands the wheel over through its own input service rather than as a
+    // broadcast, and that service is not always up yet when CarPlay attaches. Hence the retries.
+    private fun startInterception(context: Context, controller: CarPlayController) {
+        releaseInterception()
+        interceptorController = controller
+        if (!EcarxKeyInterceptor.isSupported()) return
+        interceptor = EcarxKeyInterceptor(context)
+        claimSteeringWheel()
+    }
+
+    private fun claimSteeringWheel() {
+        val interceptor = interceptor ?: return
+        for (keyCodes in ECARX_KEY_GROUPS) {
+            val granted = interceptor.start(keyCodes) { keyCode -> pressCarPlayKey(keyCode) }
+            if (granted != null && granted.isNotEmpty()) {
+                Log.i(TAG, "steering-wheel keys: ECARX granted ${granted.joinToString()}")
+                return
+            }
+        }
+        if (++interceptionAttempts >= ECARX_MAX_ATTEMPTS) {
+            Log.i(TAG, "steering-wheel keys: no ECARX grant after $interceptionAttempts attempts")
+            return
+        }
+        mainHandler.postDelayed(retryInterception, ECARX_RETRY_DELAY_MILLIS)
+    }
+
+    /** True when the key went to CarPlay, so the head unit does not also act on it. */
+    private fun pressCarPlayKey(keyCode: Int): Boolean {
+        val controller = interceptorController ?: return false
+        if (CarPlayMediaButton.opensSiri(keyCode)) return controller.requestSiri()
+        val index = CarPlayMediaButton.forKeyCode(keyCode) ?: return false
+        val sent = controller.sendMediaButton(index)
+        Log.i(TAG, "steering-wheel key $keyCode -> CarPlay $index sent=$sent")
+        return sent
+    }
+
+    private fun stopInterception() {
+        releaseInterception()
+        interceptorController = null
+    }
+
+    private fun releaseInterception() {
+        mainHandler.removeCallbacks(retryInterception)
+        interceptor?.stop()
+        interceptor = null
+        interceptionAttempts = 0
+    }
+
+    /**
+     * Worth offering the head unit, most specific first. It grants only the codes it knows, so the
+     * first group that comes back non-empty is the one this wheel actually sends.
+     */
+    private val ECARX_KEY_GROUPS = listOf(
+        intArrayOf(
+            CarPlayMediaButton.KEYCODE_ECARX_MEDIA_NEXT,
+            CarPlayMediaButton.KEYCODE_ECARX_MEDIA_PREVIOUS,
+            CarPlayMediaButton.KEYCODE_ECARX_MEDIA_PLAY_PAUSE,
+            CarPlayMediaButton.KEYCODE_ECARX_VOICE_ASSIST,
+        ),
+        intArrayOf(
+            CarPlayMediaButton.KEYCODE_ECARX_SEEK_NEXT,
+            CarPlayMediaButton.KEYCODE_ECARX_SEEK_PREVIOUS,
+            CarPlayMediaButton.KEYCODE_ECARX_R_SEEK_NEXT,
+            CarPlayMediaButton.KEYCODE_ECARX_R_SEEK_PREVIOUS,
+        ),
+        intArrayOf(
+            KeyEvent.KEYCODE_MEDIA_NEXT,
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+        ),
+    )
+
+    private var interceptor: EcarxKeyInterceptor? = null
+    private var interceptorController: CarPlayController? = null
+    private var interceptionAttempts = 0
+    private val retryInterception = Runnable { claimSteeringWheel() }
 
     private interface Backend {
         fun attach(context: Context, controller: CarPlayController)
