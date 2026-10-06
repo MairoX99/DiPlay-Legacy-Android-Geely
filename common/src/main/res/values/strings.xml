@@ -450,4 +450,5 @@
     <string name="adb_battery_reconnect">If CarPlay connected before the battery was ready, use Apply and reconnect to enable battery reporting.</string>
     <string name="wheel_key_service_label">DiPlay steering wheel keys</string>
     <string name="wheel_key_service_description">Lets DiPlay take the steering wheel\'s media keys for CarPlay. Without it the car may keep those presses for itself, which is why the wheel does nothing while CarPlay is on screen. Volume and every other key are unaffected.</string>
+    <string name="usb_auto_confirm_desc">Automatically ticks Always allow and confirms the Android USB accessory prompt for CarPlay</string>
 </resources>

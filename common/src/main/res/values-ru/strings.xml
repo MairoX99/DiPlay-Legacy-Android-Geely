@@ -439,4 +439,5 @@
     <string name="adb_battery_reconnect">Если CarPlay подключился до получения данных батареи, нажмите «Применить и переподключить», чтобы включить передачу данных батареи.</string>
     <string name="wheel_key_service_label">Кнопки руля DiPlay</string>
     <string name="wheel_key_service_description">Позволяет DiPlay перехватывать медиакнопки руля для CarPlay. Без этого головное устройство может оставить эти нажатия себе — именно поэтому руль не реагирует, пока на экране CarPlay. Громкость и все остальные кнопки работают как обычно.</string>
+    <string name="usb_auto_confirm_desc">Автоматически ставит «Всегда разрешать» и подтверждает запрос доступа к USB-аксессуару Android для CarPlay</string>
 </resources>

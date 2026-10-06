@@ -37,6 +37,19 @@
                 android:resource="@xml/wheel_key_service" />
         </service>
 
+        <!-- Also off until the driver switches it on. -->
+        <service
+            android:name="com.shilapi.xcertplay.UsbAutoConfirmService"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/usb_auto_confirm_service_config" />
+        </service>
+
         <activity
             android:name="com.shilapi.xcertplay.CarPlayHostActivity"
             android:configChanges="density|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"

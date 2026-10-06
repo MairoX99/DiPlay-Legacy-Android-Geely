@@ -439,4 +439,5 @@
     <string name="adb_battery_reconnect">إذا اتصل CarPlay قبل أن تصبح بيانات البطارية جاهزة، استخدم «تطبيق وإعادة الاتصال» لتفعيل إرسال بيانات البطارية.</string>
     <string name="wheel_key_service_label">مفاتيح المقود في DiPlay</string>
     <string name="wheel_key_service_description">يسمح لـ DiPlay بالتقاط مفاتيح الوسائط في المقود لصالح CarPlay. بدون ذلك قد تحتفظ السيارة بهذه الضغطات لنفسها، ولهذا لا يستجيب المقود أثناء عرض CarPlay. لا يتأثر مفتاح الصوت ولا أي مفتاح آخر.</string>
+    <string name="usb_auto_confirm_desc">يحدّد «السماح دائمًا» تلقائيًا ويؤكّد نافذة إذن ملحقات USB في Android لـ CarPlay</string>
 </resources>
