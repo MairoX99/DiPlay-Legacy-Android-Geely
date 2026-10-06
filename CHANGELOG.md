@@ -4,11 +4,43 @@ This file records **this fork's** releases only. Upstream DiPlay maintains its o
 [shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay).
 
 **Base:** upstream DiPlay **v0.2.7**, via `programmerguohuajing/DiPlay-Legacy-Android`.
+**Upstream alignment:** every entry below states the upstream DiPlay version it was checked
+against. The base never moves — it is what makes this fork installable on old head units — so the
+alignment line, not the base line, is what says how current a release is.
 **Target:** Geely Xingrui E01 (ECARX E01 / MediaTek MT6735, GKUI 19, **Android 5.1 / API 22**).
 
 ---
 
+## 0.3.1-geely-rc — 2026-10-06
+
+**Upstream alignment:** checked against DiPlay **v0.2.13** (483 commits ahead of the v0.2.7 base).
+That release added 19 commits over the previously screened point, of which exactly one is portable
+here; the rest is Traditional Chinese translations and upstream-only documentation.
+
+### Wireless
+
+- **Fix wireless CarPlay failing on head units with no NSD service.** The Bonjour advertiser looked
+  Android's NSD service up eagerly while constructing, even though this fork advertises over
+  interface-bound mDNS (`useInterfaceMdns = true`) and never touches NSD. Where the service is
+  absent the lookup returned null and the whole wireless stack failed before it started. The lookup
+  is now deferred and nullable. Ported from upstream `32550b2`. Not yet verified on the car — the
+  change can only remove a failure, it adds no behaviour to observe.
+
+### Build
+
+- **`gradlew` regains its executable bit.** Both workflows invoke `./gradlew`, which had been
+  failing with `Permission denied` on every push; local runs used `sh gradlew`, so it stayed hidden
+  and `Android checks` was red throughout.
+- **Releases are now automatic.** Pushing to `main` derives the tag from `versionName` and publishes
+  the APK with `SHA256SUMS.txt`; a version that already has a Release is skipped. Publishing is
+  gated on the tag matching `versionName`, the release notes existing, the source tree being free of
+  credentials, and the APK carrying a valid v1+v2 signature and the accessory identity.
+
+---
+
 ## 0.3.0-geely-rc — 2026-10-06
+
+**Upstream alignment:** checked against DiPlay **v0.2.12 + unreleased** (464 commits ahead of base).
 
 ### Diagnostics
 
@@ -30,6 +62,8 @@ This file records **this fork's** releases only. Upstream DiPlay maintains its o
 ---
 
 ## 0.2.9.1-geely-rc — 2026-10-06
+
+**Upstream alignment:** checked against DiPlay **v0.2.7 + unreleased**.
 
 The fork's first published release. Earlier `-geely-rc` tags were withdrawn before release, so
 everything the fork added up to that point is listed here.
