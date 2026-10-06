@@ -24,11 +24,13 @@
 This fork's code base is the Legacy snapshot of upstream DiPlay **v0.2.7**. Upstream has since
 reached **v0.2.12 plus unreleased work** — 464 commits in six feature groups. Aligning with it is a
 staged program, not a merge: the two share no history, and upstream targets Android 9 while this
-fork targets Android 4.4, so every ported piece has to be checked against the older platform.
+fork keeps an Android 4.4 (API 19) floor, so every ported piece has to be checked against the older
+platform. The reference car — a Geely Xingrui E01 running GKUI 19 — is itself **Android 5.1
+(API 22)**, so the floor is a floor, not the target.
 
 | Feature group | State |
 |---|---|
-| **Steering-wheel keys** | **Partly aligned.** The generic accessibility filter is in, and so are the ECARX key codes. The map zoom and joystick upstream built on top of the same service drive a BYD dashboard this car does not have. |
+| **Steering-wheel keys** | **Done, and verified on the car.** The wheel goes through the head unit's own input service, which re-emits each press as a standard `ACTION_MEDIA_BUTTON`. The fix that mattered was the media session: it now declares `FLAG_HANDLES_MEDIA_BUTTONS` and a media-button receiver, so the framework picks DiPlay instead of whichever app held the wheel before. The generic accessibility filter and the ECARX key codes stay as fallbacks for other head units — neither was needed here. The map zoom and joystick upstream built on the same service drive a BYD dashboard this car does not have. |
 | **Wireless connection** | **Partly aligned.** Switching the car hotspot on, and reporting why it failed, is in. Existing Wi-Fi / Same LAN, Wi-Fi Direct group recovery, preferred-channel selection and the hotspot-join state machine are not. |
 | **Wired / USB** | Not started. |
 | **Protocol and audio** | Not started. |
@@ -37,9 +39,18 @@ fork targets Android 4.4, so every ported piece has to be checked against the ol
 
 Features that depend on BYD hardware — the DiLink 3/4/5 cluster projection, BYD HUD navigation, CAN
 battery reporting — have no counterpart on a Geely head unit. They are **out of scope rather than
-outstanding**, and are not planned.
+outstanding**, and are not planned. The code stays in the tree so upstream syncs stay cheap, but the
+SOME/IP HUD bridge now checks that its gateway is installed before binding, so a head unit without
+one no longer retries a service it can never reach (that retry used to run every 300 ms).
 
-**Status:** both steering-wheel paths are new and have not been verified on a car. They degrade to the previous behaviour on a head unit that offers neither, so non-Geely cars are unaffected. Check `DiPlay-WheelKeys` for whether the accessibility filter was switched on and what it saw, `DiPlay-EcarxKeys` for whether the ECARX input service was found and what it granted, and `DiPlay-MediaKeys` for each key forwarded to CarPlay.
+**Status:** steering-wheel track skip is **verified on the car** — a Geely Xingrui E01 on Android 5.1
+sends next and previous track through to CarPlay. That wheel has no play/pause key; the position is
+the head unit's own screen-mirroring button, which never enters the Android key pipeline and so is
+not reachable by any app. Every other ported piece is still unverified on a car, and each degrades to
+the previous behaviour on a head unit that offers neither path, so non-Geely cars are unaffected.
+Check `DiPlay-MediaKeys` for each key forwarded to CarPlay, `DiPlay-WheelKeys` for whether the
+accessibility filter was switched on and what it saw, and `DiPlay-EcarxKeys` for whether the ECARX
+input service was found and what it granted.
 
 [Download & website](https://shihabal3amri.github.io/DiPlay/) · [Release](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.7) · [Report a problem](https://github.com/shihabal3amri/DiPlay/issues/new/choose)
 
