@@ -38,3 +38,6 @@ release-signing.properties
 *.key
 *.apk
 *.aab
+
+# Locally packaged car-test artifacts (scripts/package-geely.sh)
+/dist/
