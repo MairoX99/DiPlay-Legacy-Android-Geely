@@ -19,6 +19,11 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
+    testOptions {
+        // Lets Robolectric tests read res/xml and res/values, not just plain Android APIs.
+        unitTests.isIncludeAndroidResources = true
+    }
+
 }
 
 dependencies {
