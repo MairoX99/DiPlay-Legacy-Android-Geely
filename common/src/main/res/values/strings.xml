@@ -385,6 +385,7 @@
     <string name="wireless_carplay_active">Wireless CarPlay active</string>
     <string name="wireless_carplay_control_running">Wireless CarPlay control running</string>
     <string name="wireless_carplay_transport">Wireless CarPlay transport</string>
+    <string name="wireless_carplay_unavailable_no_bluetooth_data_channel" tools:ignore="MissingTranslation">Wireless CarPlay cannot work on this head unit: its Bluetooth stack offers apps no data channel. Use the USB cable.</string>
     <string name="wireless_connection_help">Wireless connection help</string>
     <string name="wireless_hotspot_off">Wireless hotspot: off</string>
     <string name="wireless_permissions">Wireless permissions</string>

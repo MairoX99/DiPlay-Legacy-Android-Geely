@@ -385,6 +385,7 @@
     <string name="wireless_carplay_active">无线 CarPlay 已启用</string>
     <string name="wireless_carplay_control_running">无线 CarPlay 控制通道运行中</string>
     <string name="wireless_carplay_transport">无线 CarPlay 连接</string>
+    <string name="wireless_carplay_unavailable_no_bluetooth_data_channel">无线 CarPlay 在本车无法工作：车机蓝牙栈不向应用开放数据通道。请使用 USB 数据线。</string>
     <string name="wireless_connection_help">无线连接帮助</string>
     <string name="wireless_hotspot_off">无线热点：关闭</string>
     <string name="wireless_permissions">无线连接权限</string>

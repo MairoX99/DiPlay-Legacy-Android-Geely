@@ -11,12 +11,43 @@ alignment line, not the base line, is what says how current a release is.
 
 ---
 
-## Unreleased
+## 0.3.2-geely-rc — 2026-10-07
 
 **Upstream alignment:** checked against DiPlay `main` `e2fd8ea` (2026-10-07), 51 commits after
 **v0.2.13**. Four of those commits were ported. The rest stay upstream.
 
+### Head unit compatibility
+
+- **Wireless CarPlay is gone from the UI on the E01, because this head unit cannot run it.**
+  Wireless CarPlay carries its iAP2 leg over a Bluetooth RFCOMM socket. This head unit's Bluetooth
+  stack offers third-party apps no such socket, and the omission is deliberate rather than
+  unfinished — three independent removals agree: the AOSP-derived stack in `XCBTService` has the
+  socket classes taken out (`createRfcommSocketToServiceRecord`, `listenUsingRfcommWithServiceRecord`
+  and `fetchRemoteUuids` are all absent while `getBondedDevices` and `startDiscovery` remain), the
+  ECARX facade declares `bt/spp/ISpp` and `ISppCallback` on the boot classpath without ever writing
+  a `SppProxy`, and the GOC SDK's `CommandSppImp` returns a hardcoded `false` from every entry
+  point. The vendor daemon `/system/bin/gocsdk` does implement SPP, but its 119-command vocabulary
+  has no SDP query, no custom UUID and no raw RFCOMM, so it cannot reach the iPhone's iAP2 service
+  either — and iOS opens no standard SPP to a non-MFi accessory. On the car, `reqSppConnect` to the
+  paired iPhone returns `false` and the SPP service reports `isSppServiceReady() = 0`.
+
+  **Bluetooth itself is unaffected.** Hands-free calls and music keep working, and a third-party
+  app can still read the adapter state, the connected device and the local address. What is
+  unavailable is a byte pipe over Bluetooth, and on this head unit the only thing that needs one is
+  wireless CarPlay. The home screen, Connection setup and the in-session settings now offer USB
+  alone, and `AirPlayPersistence.loadWirelessEnabled` is clamped to `false` so a value stored by an
+  earlier build cannot start a connection the hardware has no way to complete. Other head units are
+  untouched: the wireless switch and the hotspot controls still appear wherever the stack supports
+  them. Wired USB CarPlay is unchanged and remains the supported path here.
+
 ### Audio
+
+- **Navigation guidance reaches the right stream on the E01.** The fork defaulted the navigation
+  stream to 14, BYD's driver-speaker stream. The E01 renumbers the vendor streams: there 14 is
+  `STREAM_FM`, the FM tuner, and spoken guidance belongs on `STREAM_NAVI_TTS` at 10, which its own
+  `AudioManager` declares. The default now follows the head unit. An installation that already
+  stored a value keeps it — `getInt` only falls back to the default when the key is absent — so
+  re-select the stream once in settings after updating.
 
 - **Music yields while another app holds audio focus for a call.** A transient focus loss sets the
   media track gain to 0; ducking sets it to 0.2; a later gain restores 1. Phone and navigation

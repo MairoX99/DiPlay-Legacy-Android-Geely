@@ -144,9 +144,14 @@ object AirPlayPersistence {
             .apply()
     }
 
+    /**
+     * Clamped to false where the head unit cannot run the wireless transport, so a value stored by
+     * an earlier build cannot start a connection the hardware has no way to complete.
+     */
     fun loadWirelessEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_WIRELESS_ENABLED, true)
+        WirelessCarPlay.uiOffered &&
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_WIRELESS_ENABLED, true)
 
     fun saveWirelessEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
