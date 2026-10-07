@@ -11,6 +11,46 @@ alignment line, not the base line, is what says how current a release is.
 
 ---
 
+## 0.3.3-geely-rc — 2026-10-07
+
+**Upstream alignment:** checked against DiPlay `main` `5e58b4b` (2026-10-07), 19 non-merge commits
+after the previous anchor `e2fd8ea`. The upstream tag is still **v0.2.13**. None of those 19 commits
+were ported.
+
+### Playback
+
+- **Session logging and per-packet allocations leave the playback hot path.** A wired session no
+  longer logs every carkit send, every USBMUX frame, or a successful iAP2 frame. Those lines were
+  dropped by `DiagnosticRedactor` before they reached the file. Connection setup, failure, and
+  disconnect logs stay. What remains is written on one `diplay-session-log` thread, with one
+  `SimpleDateFormat` and a length counted in memory. The length and the writer lock are shared per
+  path, so a writer still draining after the activity is recreated cannot rotate a log the new
+  session just truncated.
+- **Audio and video reuse their receive buffers.** Audio keeps one receive buffer, AAD, nonce,
+  plaintext, and one ChaCha20-Poly1305 instance. Video reuses the 128-byte header and grows the body
+  up to 1 MiB, then allocates that one frame and releases the buffer when the stream closes. The RTP
+  buffer handed to the decoder and the bytes returned from `decryptFrame` are still new arrays: the
+  decode thread holds them, and the next packet must not overwrite a frame still being decoded.
+  Pairing still uses the one-shot `chachaSeal` / `chachaOpen` path. Platform ChaCha stays unported.
+
+  Frame interval and GC were not measured on the car. The head unit was not connected over adb when
+  this was built.
+
+### Not ported from this grandfather range
+
+- The settings navigation rail, its category grouping, translations, unused-string cleanup, and the
+  follow-up fixes for scroll position, hotspot readiness, and cluster-consent dialogs. That UI is
+  built around BYD vehicle, cluster, night-mode, and wheel-learning pages this fork does not carry,
+  and this fork's settings activity is already a separate Geely layout.
+- Experimental Smooth video, and the decoder offscreen-parking and surface-detach wait that exist
+  to support it. It was measured on a BYD Tang with Qualcomm `c2.qti.avc.decoder` at 2560×1440 and
+  60 fps, and it holds each frame for a display delay of 30–200 ms (about 140 ms at 30 fps to start).
+  On this head unit the picture already leaves the app slower than it arrives, and the added delay
+  would show up as later touch response. `releaseOutputBuffer(int, long)` is also API 21, below this
+  fork's API 19 floor. The MediaTek decoder was not the one those runs describe.
+
+---
+
 ## 0.3.2-geely-rc — 2026-10-07
 
 **Upstream alignment:** checked against DiPlay `main` `e2fd8ea` (2026-10-07), 51 commits after

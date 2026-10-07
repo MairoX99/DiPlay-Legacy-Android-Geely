@@ -8,7 +8,7 @@ which is itself a fork of [shihabal3amri/DiPlay](https://github.com/shihabal3amr
 Everything described here is either Geely-specific work or brand-neutral work ported from upstream.
 **Upstream's BYD-specific features are out of scope for this fork and are not documented here.**
 
-**Version:** `0.3.0-geely-rc` (versionCode 30) · App id `com.shihab.diplay`
+**Version:** `0.3.3-geely-rc` (versionCode 33) · App id `com.shihab.diplay`
 
 ## Verified on the car
 
@@ -57,7 +57,7 @@ Uninstall first:
 
 ```sh
 adb uninstall com.shihab.diplay
-adb install -r DiPlay-Legacy-Geely-V0291.apk
+adb install -r DiPlay-Legacy-Geely-V033.apk
 ```
 
 Uninstalling loses the app's settings (resolution, audio buffer, wheel-key roles, saved Wi-Fi
@@ -78,10 +78,11 @@ binding constraint on what is worth porting, not the API level alone.
 
 ## Upstream alignment
 
-This fork's base is upstream DiPlay **v0.2.7**. Upstream has since reached **v0.2.12 plus unreleased
-work** — 464 commits across six feature groups. Aligning is a staged program, not a merge: the two
-share no history, and upstream targets Android 9 (minSdk 28) while this fork keeps an API 19 floor,
-so every ported piece has to be checked against the older platform.
+This fork's base is upstream DiPlay **v0.2.7**. The latest check is upstream `main` `5e58b4b`
+(2026-10-07): 19 non-merge commits after `e2fd8ea`, still on the **v0.2.13** tag, and none of them
+were ported. Aligning is a staged program, not a merge: the two share no history, and upstream
+targets Android 9 (minSdk 28) while this fork keeps an API 19 floor, so every ported piece has to
+be checked against the older platform.
 
 | Feature group | State |
 |---|---|
