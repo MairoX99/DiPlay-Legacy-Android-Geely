@@ -91,6 +91,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -341,6 +343,11 @@ class CarPlayHostActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val teardownExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val airPlayCommandExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val sessionLogExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "diplay-session-log").apply { isDaemon = true }
+    }
+    /** Touched only on [sessionLogExecutor]. SimpleDateFormat is not thread-safe. */
+    private val sessionLogTimestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     private val logLines = ArrayDeque<LogEntry>()
     private val expireOldLogLines = Runnable { refreshLogView(System.currentTimeMillis()) }
     private val applyDisplaySize = Runnable {
@@ -776,9 +783,28 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         currentSurface = null
         currentSurfaceTexture = null
-        sessionLog?.append("Activity destroyed")
-        sessionLog?.close()
+        val log = sessionLog
         sessionLog = null
+        try {
+            sessionLogExecutor.execute {
+                try {
+                    log?.append(formattedLogLine("Activity destroyed", System.currentTimeMillis()))
+                } finally {
+                    log?.close()
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            log?.close()
+        }
+        sessionLogExecutor.shutdown()
+        try {
+            // The writer is a daemon, so a drain that misses this deadline leaves it running.
+            // SessionLogFile serialises the whole file path, so it cannot then corrupt the log
+            // a later activity instance truncates and reopens.
+            sessionLogExecutor.awaitTermination(SESSION_LOG_DRAIN_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
         super.onDestroy()
     }
 
@@ -2991,7 +3017,7 @@ class CarPlayHostActivity : ComponentActivity() {
             },
             mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
             onAudioDiagnostic = { message ->
-                diagnosticLog?.append(formattedLogLine(message, System.currentTimeMillis()))
+                diagnosticLog?.let { enqueueSessionLine(it, message) }
             },
             onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
         )
@@ -3047,6 +3073,9 @@ class CarPlayHostActivity : ComponentActivity() {
             }
 
             override fun onDebugLog(message: String) {
+                // "TRACE ", "PHONE ", and multiline text are dropped on purpose.
+                // Protocol payloads are not written to the session file, so the old
+                // TRACE file branch could never run.
                 if (DiagnosticRedactor.redact(message) == null) return
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration) {
@@ -3054,11 +3083,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     DisplayDiagnosticSnapshot.record(this@CarPlayHostActivity, displayDiagnosticAttempt, message)
                     if (menuOpen) return@runOnUiThread
-                    if (message.startsWith(PROTOCOL_TRACE_PREFIX)) {
-                        appendFileLog(message)
-                    } else {
-                        appendLog(message)
-                    }
+                    appendLog(message)
                 }
             }
         }
@@ -3574,16 +3599,25 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun appendLog(message: String) {
-        val safe = DiagnosticRedactor.redact(message) ?: return
-        sessionLog?.append(formattedLogLine(safe, System.currentTimeMillis()))
+        val log = sessionLog ?: return
+        enqueueSessionLine(log, message)
     }
 
-    private fun appendFileLog(message: String) {
-        sessionLog?.append(formattedLogLine(message, System.currentTimeMillis()))
+    private fun enqueueSessionLine(log: SessionLogFile, message: String) {
+        val nowMillis = System.currentTimeMillis()
+        try {
+            sessionLogExecutor.execute {
+                val safe = DiagnosticRedactor.redact(message) ?: return@execute
+                log.append(formattedLogLine(safe, nowMillis))
+            }
+        } catch (_: RejectedExecutionException) {
+            // onDestroy has already shut the writer down.
+        }
     }
 
+    /** Called only on [sessionLogExecutor]. */
     private fun formattedLogLine(message: String, nowMillis: Long): String =
-        "${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(nowMillis))}  $message"
+        "${sessionLogTimestamp.format(Date(nowMillis))}  $message"
 
     private fun initializeSessionLog() {
         val logFile = File(File(filesDir, "logs"), "diplay.log")
@@ -3677,9 +3711,9 @@ class CarPlayHostActivity : ComponentActivity() {
         const val RECONNECT_DELAY_MILLIS = 2_000L
         const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L
         const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L
+        const val SESSION_LOG_DRAIN_TIMEOUT_MILLIS = 500L
         const val AUDIO_CAPTURE_MARKER = "audio-capture.enabled"
         const val AUDIO_CAPTURE_DIRECTORY = "audio-captures"
-        const val PROTOCOL_TRACE_PREFIX = "TRACE "
         const val THREE_FINGER_COUNT = 3
         const val THREE_FINGER_SWIPE_DISTANCE_DP = 72
         const val THREE_FINGER_SWIPE_DIRECTION_RATIO = 1.15f

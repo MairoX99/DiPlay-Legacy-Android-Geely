@@ -1523,31 +1523,10 @@ class CarPlayController(
                 carKitClient.open(pairRecord, config.label)
             }
             debugLog("wired com.apple.carkit.service stream opened")
-            // Lab transport diagnostics: packet headers only, never certificate or challenge data.
-            fun wireSummary(bytes: ByteArray): String {
-                if (bytes.size < 9 || bytes[0].toInt() and 0xff != 0xff ||
-                    bytes[1].toInt() and 0xff != 0x5a) return "bytes=${bytes.size}"
-                fun value(index: Int) = bytes[index].toInt() and 0xff
-                return "bytes=${bytes.size} length=${(value(2) shl 8) or value(3)} " +
-                    "flags=${value(4)} seq=${value(5)} ack=${value(6)} session=${value(7)}"
-            }
-            val tracedCarkit = object : com.shilapi.xcertplay.transport.BlockingDuplexByteStream {
-                override fun send(data: ByteArray) {
-                    debugLog("wired link TX begin ${wireSummary(data)}")
-                    // Bound each TLS write while diagnosing the stalled certificate transfer.
-                    for (offset in data.indices step 256) {
-                        carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
-                    }
-                    debugLog("wired link TX completed bytes=${data.size}")
-                }
-                override fun recv(maxBytes: Int, timeoutMillis: Long): ByteArray? =
-                    carkit.recv(maxBytes, timeoutMillis)?.also {
-                        debugLog("wired link RX ${wireSummary(it)}")
-                    }
-                override fun close() = carkit.close()
-            }
+            // One write per iAP2 send. Per-packet traces and the 256-byte certificate
+            // diagnosis writes used to run here on every playback frame.
             val csm = Iap2Session.open(
-                tracedCarkit,
+                carkit,
                 traceContext = "wired",
                 onTrace = ::debugLog,
             )

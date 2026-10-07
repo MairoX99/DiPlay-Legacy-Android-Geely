@@ -16,6 +16,10 @@ import com.shilapi.xcertplay.transport.Iap2CsmChannel
  * [Iap2CsmChannel] remains the lower-level frame transport. This class is the protocol-facing
  * facade used by services: it accepts endpoint builders, sends complete frames, receives complete
  * frames, and exposes the typed body reader.
+ *
+ * Successful frames are not passed to [onTrace]. [Iap2FrameFormatter.format] walks every TLV on
+ * the transport thread, and playback does not need that text. Failures, ready, and close are
+ * still reported.
  */
 class Iap2Session private constructor(
     private val channel: Iap2CsmChannel,
@@ -33,7 +37,6 @@ class Iap2Session private constructor(
     fun send(frame: Iap2Frame, timeoutMillis: Long = DEFAULT_SEND_TIMEOUT_MILLIS) {
         try {
             channel.send(frame, timeoutMillis)
-            emitFrameTrace(Iap2TraceDirection.TX, frame)
         } catch (failure: Throwable) {
             emitTrace(
                 Iap2FrameFormatter.formatFailure(
@@ -65,7 +68,7 @@ class Iap2Session private constructor(
 
     fun recv(timeoutMillis: Long): Iap2Frame? {
         return try {
-            channel.recv(timeoutMillis)?.also { emitFrameTrace(Iap2TraceDirection.RX, it) }
+            channel.recv(timeoutMillis)
         } catch (failure: Throwable) {
             emitTrace(
                 Iap2FrameFormatter.formatFailure(
@@ -86,21 +89,6 @@ class Iap2Session private constructor(
             channel.close()
         } finally {
             emitTrace("IAP2 CLOSE [$traceContext]")
-        }
-    }
-
-    private fun emitFrameTrace(direction: Iap2TraceDirection, frame: Iap2Frame) {
-        try {
-            emitTrace(Iap2FrameFormatter.format(direction, traceContext, frame))
-        } catch (failure: Exception) {
-            emitTrace(
-                Iap2FrameFormatter.formatFailure(
-                    direction,
-                    traceContext,
-                    frame.messageId,
-                    failure,
-                ),
-            )
         }
     }
 

@@ -154,11 +154,7 @@ class Iap2UsbMuxHost private constructor(
                 receiveFrames.takeFrame()?.let { frame ->
                     // LIVI only trusts the length field on receive: iPhone replies do not
                     // carry the 0xFEEDFACE word in the header's fourth field.
-                    Log.i(
-                        "xcertplay-usb",
-                        "usbmux rx proto=${frame.protocol} length=${frame.length} word8=0x" +
-                            frame.word8.toUInt().toString(16),
-                    )
+                    // Per-frame usbmux logs used to run on this path during playback.
                     nextMuxAcknowledgement = frame.sequence
                     return frame
                 }

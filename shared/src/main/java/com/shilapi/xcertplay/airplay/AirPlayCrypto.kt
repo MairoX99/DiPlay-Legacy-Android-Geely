@@ -14,6 +14,42 @@ import org.bouncycastle.crypto.params.X25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 import java.security.SecureRandom
 
+/**
+ * One ChaCha20-Poly1305 instance for a single thread.
+ *
+ * Playback reuses this across packets and calls [process] again for each one.
+ * The allocating [AirPlayCrypto.chachaSeal] and [AirPlayCrypto.chachaOpen] stay
+ * for pairing and other paths that run rarely.
+ */
+internal class AirPlayAead(private val forEncryption: Boolean) {
+    private val cipher = ChaCha20Poly1305()
+
+    /**
+     * Encrypts or decrypts into [output]. Returns the number of bytes written at
+     * [outputOffset]. [input] is read from [inputOffset] for [inputLength] bytes,
+     * so a receive buffer can be used in place.
+     */
+    fun process(
+        key: ByteArray,
+        nonce: ByteArray,
+        input: ByteArray,
+        inputOffset: Int,
+        inputLength: Int,
+        aad: ByteArray,
+        output: ByteArray,
+        outputOffset: Int = 0,
+    ): Int {
+        cipher.init(forEncryption, AEADParameters(KeyParameter(key), MAC_BITS, nonce, aad))
+        val written = cipher.processBytes(input, inputOffset, inputLength, output, outputOffset)
+        val finished = cipher.doFinal(output, outputOffset + written)
+        return written + finished
+    }
+
+    private companion object {
+        const val MAC_BITS = 128
+    }
+}
+
 /** BouncyCastle-backed primitives for the CarPlay pairing and control channel. */
 object AirPlayCrypto {
     private const val MAC_BITS = 128
@@ -105,12 +141,22 @@ object AirPlayCrypto {
     /** 12-byte nonce: four zero bytes followed by an eight-byte little-endian counter. */
     fun nonce64(counter: Long): ByteArray {
         val nonce = ByteArray(NONCE_SIZE)
+        nonce64Into(counter, nonce)
+        return nonce
+    }
+
+    /** Writes [nonce64] into an existing 12-byte buffer. The first four bytes are cleared. */
+    fun nonce64Into(counter: Long, nonce: ByteArray) {
+        require(nonce.size >= NONCE_SIZE)
+        nonce[0] = 0
+        nonce[1] = 0
+        nonce[2] = 0
+        nonce[3] = 0
         var value = counter
         for (index in 4 until NONCE_SIZE) {
             nonce[index] = value.toByte()
             value = value ushr 8
         }
-        return nonce
     }
 
     /** 12-byte nonce from an eight-byte ASCII label placed after four zero bytes. */

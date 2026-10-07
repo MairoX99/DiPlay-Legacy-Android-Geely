@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  *     wire bytes
  *     decrypted RTP bytes when length >= 0
  *     UTF-8 error bytes
+ *
+ * [record] copies the bytes before it returns. The caller may reuse both arrays.
  */
 class AudioPacketCapture(
     directory: File,
@@ -75,27 +77,30 @@ class AudioPacketCapture(
 
     fun record(
         wire: ByteArray,
+        wireLength: Int,
         rtp: ByteArray?,
         sample: Int?,
         error: Throwable?,
     ) {
         if (output == null || closed.get()) return
+        val wireBytes = wireLength.coerceIn(0, wire.size)
+        val rtpBytes = rtp?.size ?: 0
         synchronized(this) {
             if (closed.get() || packets >= maxPackets) return
             val errorBytes = error?.message?.toByteArray(Charsets.UTF_8) ?: ByteArray(0)
-            val recordBytes = 4L * 4 + 8 + wire.size + (rtp?.size ?: 0) + errorBytes.size
+            val recordBytes = 4L * 4 + 8 + wireBytes + (if (rtp != null) rtpBytes else 0) + errorBytes.size
             if (bytesWritten + recordBytes > maxBytes) {
                 close()
                 return
             }
             try {
-                output.writeInt(wire.size)
-                output.writeInt(rtp?.size ?: -1)
+                output.writeInt(wireBytes)
+                output.writeInt(if (rtp != null) rtpBytes else -1)
                 output.writeInt(sample ?: -1)
                 output.writeLong(System.nanoTime())
                 output.writeInt(errorBytes.size)
-                output.write(wire)
-                if (rtp != null) output.write(rtp)
+                output.write(wire, 0, wireBytes)
+                if (rtp != null) output.write(rtp, 0, rtpBytes)
                 output.write(errorBytes)
                 packets += 1
                 bytesWritten += recordBytes

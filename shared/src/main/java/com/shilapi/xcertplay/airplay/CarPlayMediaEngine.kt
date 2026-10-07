@@ -153,11 +153,12 @@ class CarPlayMediaEngine(
 
                 override fun onPacket(
                     wire: ByteArray,
+                    wireLength: Int,
                     rtp: ByteArray?,
                     sample: Int?,
                     error: Throwable?,
                 ) {
-                    capture?.record(wire, rtp, sample, error)
+                    capture?.record(wire, wireLength, rtp, sample, error)
                 }
             },
         )

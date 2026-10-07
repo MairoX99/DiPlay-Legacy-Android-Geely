@@ -30,6 +30,12 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
     private val closed = AtomicBoolean(false)
     private val frameCounter = AtomicLong(0)
     private val firstFrameLogged = AtomicBoolean(false)
+    private val headerBuffer = ByteArray(HEADER_LEN)
+
+    /** Reused only up to [MAX_REUSED_BODY_BYTES]. Larger frames get a one-shot array. */
+    @Volatile private var bodyBuffer = ByteArray(0)
+    private val frameCipher = AirPlayAead(forEncryption = false)
+    private val frameNonce = ByteArray(12)
     private var server: ServerSocket? = null
     private var socket: Socket? = null
     private var thread: Thread? = null
@@ -50,6 +56,9 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
         safeClose(socket)
         safeClose(server)
         thread?.interrupt()
+        // The media sink keeps a recovery handler that captures this stream, so the instance
+        // outlives the connection. Drop the buffer rather than carry it into the next session.
+        bodyBuffer = ByteArray(0)
     }
 
     private fun accept(bound: ServerSocket) {
@@ -69,12 +78,18 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
             val input = sock.getInputStream()
             while (!closed.get()) {
                 stats.reading()
-                val header = readFully(input, HEADER_LEN) ?: break
-                val bodySize = readU32Le(header, 0)
+                if (!readFully(input, headerBuffer, HEADER_LEN)) break
+                val bodySize = readU32Le(headerBuffer, 0)
                 if (bodySize > MAX_BODY) break
-                val body = readFully(input, bodySize) ?: break
+                val body = if (bodySize <= MAX_REUSED_BODY_BYTES) {
+                    if (bodyBuffer.size < bodySize) bodyBuffer = ByteArray(bodySize)
+                    bodyBuffer
+                } else {
+                    ByteArray(bodySize)
+                }
+                if (!readFully(input, body, bodySize)) break
                 stats.received(HEADER_LEN + bodySize)
-                onMessage(header, body, stats)
+                onMessage(headerBuffer, body, bodySize, stats)
                 stats.processed()
             }
         } catch (error: Exception) {
@@ -87,47 +102,63 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
         }
     }
 
-    private fun onMessage(header: ByteArray, body: ByteArray, stats: StreamReceiveStats) {
+    private fun onMessage(
+        header: ByteArray,
+        body: ByteArray,
+        bodyLength: Int,
+        stats: StreamReceiveStats,
+    ) {
         when (header[OPCODE_OFFSET].toInt() and 0xff) {
             OP_VIDEO_FRAME -> {
-                val payload = if (body.size >= ScreenCodec.TAG_SIZE) {
+                // decryptFrame returns a new array. bodyBuffer is filled again on the
+                // next read, and VideoDecodeQueue keeps the returned bytes on the
+                // decoder thread. A frame shorter than the tag is copied for the same
+                // reason: handing back bodyBuffer would let the next frame overwrite it.
+                val payload = if (bodyLength >= ScreenCodec.TAG_SIZE) {
                     val start = System.nanoTime()
-                    ScreenCodec.decryptFrame(key, frameCounter.get(), header, body)
-                        .also {
-                            stats.decrypted(System.nanoTime() - start, body.size)
-                            frameCounter.incrementAndGet()
-                        }
+                    ScreenCodec.decryptFrame(
+                        key,
+                        frameCounter.get(),
+                        header,
+                        body,
+                        bodyLength,
+                        frameCipher,
+                        frameNonce,
+                    ).also {
+                        stats.decrypted(System.nanoTime() - start, bodyLength)
+                        frameCounter.incrementAndGet()
+                    }
                 } else {
-                    body
+                    body.copyOf(bodyLength)
                 }
                 if (firstFrameLogged.compareAndSet(false, true)) {
                     Log.i(
                         TAG,
-                        "video first decrypted frame sealed=${body.size} plain=${payload.size} " +
+                        "video first decrypted frame sealed=$bodyLength plain=${payload.size} " +
                         "head=${payload.hexPrefix(16)}",
                     )
                 }
                 listener.onFrame(ScreenCodec.lengthPrefixedToAnnexB(payload))
             }
             OP_VIDEO_CONFIG -> {
-                val (codec, codecData) = ScreenCodec.detectConfig(body)
-                Log.i(TAG, "video codec config codec=$codec body=${body.size} data=${codecData.size}")
+                val exact = body.copyOf(bodyLength)
+                val (codec, codecData) = ScreenCodec.detectConfig(exact)
+                Log.i(TAG, "video codec config codec=$codec body=$bodyLength data=${codecData.size}")
                 listener.onCodec(codec)
                 listener.onConfig(codecData)
             }
         }
     }
 
-    private fun readFully(input: InputStream, length: Int): ByteArray? {
-        if (length < 0) return null
-        val output = ByteArray(length)
+    private fun readFully(input: InputStream, output: ByteArray, length: Int): Boolean {
+        if (length < 0 || length > output.size) return false
         var offset = 0
         while (offset < length) {
             val read = input.read(output, offset, length - offset)
-            if (read < 0) return null
+            if (read < 0) return false
             offset += read
         }
-        return output
+        return true
     }
 
     private companion object {
@@ -137,6 +168,13 @@ class ScreenStream(private val key: ByteArray, private val onDiagnostic: (String
         const val OP_VIDEO_FRAME = 0
         const val OP_VIDEO_CONFIG = 1
         const val MAX_BODY = 8 * 1024 * 1024
+
+        /**
+         * Ceiling for the reused body buffer. Real frames are far smaller; above this the frame
+         * is allocated once and dropped, so a single oversized frame cannot pin its length for
+         * the life of the stream.
+         */
+        const val MAX_REUSED_BODY_BYTES = 1024 * 1024
     }
 }
 
@@ -145,9 +183,32 @@ private fun ByteArray.hexPrefix(length: Int): String =
 
 /** Extracts the avcC/hvcC codec-data record from a VideoConfig payload. */
 object ScreenCodec {
-    fun decryptFrame(key: ByteArray, counter: Long, header: ByteArray, body: ByteArray): ByteArray =
-        if (body.size < TAG_SIZE) body
-        else AirPlayCrypto.chachaOpen(key, AirPlayCrypto.nonce64(counter), body, header)
+    /**
+     * Decrypts one video frame into a new array.
+     *
+     * [body] may be a reused receive buffer longer than [bodyLength], and the caller
+     * overwrites it on the next frame. [lengthPrefixedToAnnexB] mutates the returned
+     * array, and the decode queue keeps that array on another thread. Do not decrypt
+     * into [body] or into any other buffer the caller will reuse.
+     *
+     * [header] is associated data in full. It must be the 128-byte screen header,
+     * not a larger buffer with a stale tail.
+     */
+    internal fun decryptFrame(
+        key: ByteArray,
+        counter: Long,
+        header: ByteArray,
+        body: ByteArray,
+        bodyLength: Int,
+        cipher: AirPlayAead,
+        nonce: ByteArray,
+    ): ByteArray {
+        if (bodyLength < TAG_SIZE) return body.copyOf(bodyLength.coerceAtLeast(0))
+        AirPlayCrypto.nonce64Into(counter, nonce)
+        val output = ByteArray(bodyLength - TAG_SIZE)
+        val written = cipher.process(key, nonce, body, 0, bodyLength, header, output, 0)
+        return if (written == output.size) output else output.copyOf(written)
+    }
 
     /**
      * Replaces each four-byte NAL length with an Annex B start code in place.

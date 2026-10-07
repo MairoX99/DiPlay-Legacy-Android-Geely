@@ -75,4 +75,33 @@ class DiagnosticRedactorTest {
         for (line in lines) assertNotNull(line, DiagnosticRedactor.redact(line))
         assertFalse(DiagnosticRedactor.redact(lines.last())!!.contains("192.168.49.1"))
     }
+
+    /**
+     * An activity can be recreated while the previous session's writer is still draining, which
+     * puts two SessionLogFile instances on one path. The newcomer truncates the file; the old
+     * writer's next append must not read its own stale size and rotate that fresh file away.
+     */
+    @Test fun aNewInstancesTruncateSurvivesTheOldWritersNextAppend() {
+        val folder = Files.createTempDirectory("diplay-log-shared-state").toFile()
+        try {
+            val path = folder.resolve("diplay.log")
+            val previous = SessionLogFile(path)
+            previous.reset("session=previous")
+            val filler = "connection state " + "x".repeat(690)
+            var appends = 0
+            while (path.length() <= SessionLogFile.MAX_BYTES && appends < 3000) {
+                previous.append(filler)
+                appends++
+            }
+            assertTrue("fixture must leave the previous writer above MAX_BYTES", path.length() > SessionLogFile.MAX_BYTES)
+
+            SessionLogFile(path).use { it.reset("session=new") }
+            previous.append("drained line from the previous session")
+            previous.close()
+
+            val report = path.readText()
+            assertTrue("the previous writer rotated the new session's log away", report.contains("session=new"))
+            assertTrue(report.contains("drained line from the previous session"))
+        } finally { folder.deleteRecursively() }
+    }
 }
