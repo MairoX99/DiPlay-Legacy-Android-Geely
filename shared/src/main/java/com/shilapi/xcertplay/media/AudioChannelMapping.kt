@@ -42,7 +42,7 @@ internal object AudioChannelMapper {
         audioType: String,
         payloadType: Int,
         mode: AudioChannelMappingMode,
-        navigationStreamType: Int = DEFAULT_NAVIGATION_STREAM_TYPE,
+        navigationStreamType: Int = NavigationAudioStream.deviceDefault,
     ): AudioChannelSelection {
         val normalized = audioType.lowercase()
         return when (mode) {
