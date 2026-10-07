@@ -986,7 +986,13 @@ class CarPlayController(
                 closeWirelessStack()
                 return
             }
-            val stream = BluetoothRfcommDuplexStream(socket).also { bluetoothStream = it }
+            // The stream owns the socket and closes it if the input or output getter fails.
+            // Drop the second owner so teardown cannot close it again.
+            val stream = try {
+                BluetoothRfcommDuplexStream(socket) { message -> debugLog(message) }.also { bluetoothStream = it }
+            } finally {
+                if (bluetoothSocket === socket) bluetoothSocket = null
+            }
             val channel = Iap2Session.openWireless(
                 stream,
                 traceContext = "wireless-rfcomm",

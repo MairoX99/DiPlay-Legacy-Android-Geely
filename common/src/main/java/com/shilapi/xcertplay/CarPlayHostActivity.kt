@@ -3087,6 +3087,7 @@ class CarPlayHostActivity : ComponentActivity() {
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.currentAttempt(this)
         controller = snapshot.controller
         sink = snapshot.sink
+        CarPlayMediaKeys.bindAudioFocusTarget(snapshot.sink::onExternalAudioFocus)
         CarPlayBackgroundSession.store(snapshot.controller, snapshot.sink, snapshot.width, snapshot.height, this) { completion ->
             runOnUiThread {
                 shutdown(false, "DiPlay disconnect", completion)
@@ -3165,6 +3166,7 @@ class CarPlayHostActivity : ComponentActivity() {
             controllerGeneration = controllerGeneration,
         )
         sink = renderer
+        CarPlayMediaKeys.bindAudioFocusTarget(renderer::onExternalAudioFocus)
         currentSurface?.let(::attachSurface)
         clusterSurface?.let { renderer.setSurface(SCREEN_TYPE_ALT, it) }
         val media = createMediaEngine(renderer)

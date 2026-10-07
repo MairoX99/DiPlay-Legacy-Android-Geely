@@ -23,6 +23,10 @@ internal class StreamReceiveStats(
     private var lastSequenceGap = "none"
     private var lastSequenceGapAtMs = -1L
     private var lateOrDuplicate = 0
+    private var decryptSamples = 0
+    private var decryptBytes = 0L
+    private var decryptSumNs = 0L
+    private var maxDecryptNs = 0L
 
     fun reading() { readStart = nowNs() }
 
@@ -54,6 +58,14 @@ internal class StreamReceiveStats(
         if (timestamp != null) lastTimestamp = timestamp
     }
 
+    /** One payload opened in [durationNs]; reported only for streams that call it. */
+    fun decrypted(durationNs: Long, size: Int) {
+        decryptSamples++
+        decryptBytes += size
+        decryptSumNs += durationNs
+        maxDecryptNs = maxOf(maxDecryptNs, durationNs)
+    }
+
     fun processed() {
         maxProcessNs = maxOf(maxProcessNs, nowNs() - processingStart)
         flush()
@@ -66,8 +78,12 @@ internal class StreamReceiveStats(
             "processMaxUs=${maxProcessNs / 1000} seqForwardGaps=$forwardGapPackets " +
             "lateOrDuplicate=$lateOrDuplicate interArrivalMaxMs=${maxInterArrivalNs / 1_000_000} " +
             "seqGapEvents=$sequenceGapEvents seqGapMax=$maxSequenceGap " +
-            "seqGapLast=[$lastSequenceGap] seqGapAtMs=$lastSequenceGapAtMs ended=$ended") }
+            "seqGapLast=[$lastSequenceGap] seqGapAtMs=$lastSequenceGapAtMs ended=$ended" + decryptSummary()) }
         windowStart = now
+        decryptSamples = 0
+        decryptBytes = 0
+        decryptSumNs = 0
+        maxDecryptNs = 0
         packets = 0
         bytes = 0
         maxReadNs = 0
@@ -82,5 +98,12 @@ internal class StreamReceiveStats(
     }
 
     private fun Int.toUnsignedLong(): Long = toLong() and 0xffff_ffffL
+
+    private fun decryptSummary(): String {
+        if (decryptSamples == 0) return ""
+        val mbPerSecond = if (decryptSumNs == 0L) 0L else decryptBytes * 1_000L / decryptSumNs
+        return " decryptAvgUs=${decryptSumNs / decryptSamples / 1000} decryptMaxUs=${maxDecryptNs / 1000} " +
+            "decryptMBps=$mbPerSecond"
+    }
 
 }

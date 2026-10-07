@@ -39,10 +39,18 @@ internal object CarPlayMediaKeys {
 
     fun detach(expected: CarPlayController?) {
         backend.detach(expected)
-        if (expected == null || wheelController === expected) stopInterception()
+        if (expected == null || wheelController === expected) {
+            stopInterception()
+            audioFocusTarget = null
+        }
     }
 
     fun onMediaAudioChanged(active: Boolean) = mainHandler.post { backend.update(active) }
+
+    /** Receives the same focus callbacks as the media-button session. Cleared by [detach]. */
+    fun bindAudioFocusTarget(target: ((Int) -> Unit)?) {
+        audioFocusTarget = target
+    }
     fun onIphonePlaying(playing: Boolean) {
         if (playing) mainHandler.post { backend.regainFocus() }
     }
@@ -165,6 +173,7 @@ internal object CarPlayMediaKeys {
     private val wheelPressed = Collections.synchronizedSet(mutableSetOf<Int>())
     private var lastPressKeyCode = Int.MIN_VALUE
     private var lastPressAt = 0L
+    @Volatile private var audioFocusTarget: ((Int) -> Unit)? = null
     private val retryInterception = Runnable { claimSteeringWheel() }
 
     private interface Backend {
@@ -182,6 +191,7 @@ internal object CarPlayMediaKeys {
         private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
             Log.i(TAG, "audio focus change=$change")
             if (change == AudioManager.AUDIOFOCUS_LOSS) focusHeld = false
+            audioFocusTarget?.invoke(change)
         }
 
         override fun attach(context: Context, controller: CarPlayController) {

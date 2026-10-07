@@ -11,6 +11,50 @@ alignment line, not the base line, is what says how current a release is.
 
 ---
 
+## Unreleased
+
+**Upstream alignment:** checked against DiPlay `main` `e2fd8ea` (2026-10-07), 51 commits after
+**v0.2.13**. Four of those commits were ported. The rest stay upstream.
+
+### Audio
+
+- **Music yields while another app holds audio focus for a call.** A transient focus loss sets the
+  media track gain to 0; ducking sets it to 0.2; a later gain restores 1. Phone and navigation
+  tracks are left alone, and a permanent loss does not change the gain. The fork still requests
+  focus with the API 8 call, because `AudioFocusRequest` is API 26. There is no settings switch;
+  upstream's default is on. Adapted from `#339` (`5a05b2e` and the follow-up focus fixes). The
+  BYD hang-up broadcast was not ported.
+
+### Wireless
+
+- **RFCOMM reports a missing stream and a stall instead of failing inside the platform getter.**
+  The duplex stream now owns the connected socket, so a failed getter cannot leave a second owner.
+  Ported from `5fc7a7a`. Not yet verified on the car.
+
+### USB
+
+- **A four-byte USBMUX trailer is also accepted before a captured protocol-1 diagnostic frame,**
+  in addition to the TCP replies already handled. A malformed diagnostic is still a protocol
+  error. Ported from `5fc7a7a`.
+
+### Diagnostics
+
+- **Video receive logs now include decrypt time** (`decryptAvgUs`, `decryptMaxUs`, `decryptMBps`).
+  Ported from `5b2fb6e`. The platform ChaCha20-Poly1305 path was not ported: that cipher is API 28,
+  so on this head unit it would only fall back to the BouncyCastle implementation already in use.
+
+### Not ported from this grandfather range
+
+- Scheduled day/night mode, because `CarPlayNightMode` is not on this branch yet.
+- Assignable Siri wheel key, because it depends on the wheel-key learning UI this fork does not carry.
+- Custom image picker, because that settings surface is not on this branch.
+- Software video windows, because they depend on view-area layout this fork does not carry.
+- USB read-queue size fallback, because it targets `UsbRequest.queue(ByteBuffer)` (API 26) and this
+  fork's supported range stops at Android 7.
+- Traditional Chinese, website pages, and release-site commits.
+
+---
+
 ## 0.3.1-geely-rc — 2026-10-06
 
 **Upstream alignment:** checked against DiPlay **v0.2.13** (483 commits ahead of the v0.2.7 base).

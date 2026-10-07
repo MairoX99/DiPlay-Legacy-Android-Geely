@@ -53,6 +53,7 @@ class AndroidMediaSink(
     private val videoDecoders = ConcurrentHashMap<Int, VideoDecoder>()
     private val mediaAudioTypes = mutableSetOf<Int>()
     private val audioRenderers = ConcurrentHashMap<Int, AudioRenderer>()
+    @Volatile private var mediaGain = 1f
     private val microphoneUplinks = ConcurrentHashMap<Int, MicrophoneUplink>()
     private val pendingVideoCodec = ConcurrentHashMap<Int, VideoCodec>()
     private val videoRecoveryHandlers = ConcurrentHashMap<Int, () -> Unit>()
@@ -88,6 +89,19 @@ class AndroidMediaSink(
 
     fun clearSurface(type: Int, surface: Surface) {
         if (surfaces.remove(type, surface)) videoDecoders[type]?.setSurface(null)
+    }
+
+    /**
+     * Applies a focus change reported by the media-button session.
+     * Only music tracks move; phone and navigation audio stay at full gain.
+     */
+    fun onExternalAudioFocus(change: Int) {
+        val gain = mediaTrackGainForFocus(change) ?: return
+        if (mediaGain == gain) return
+        mediaGain = gain
+        Log.i("DiPlay-AudioFocus", "media gain=$gain focus=$change")
+        onAudioDiagnostic("Audio: media gain=$gain focus=$change")
+        audioRenderers.values.forEach { it.applyMediaGain(gain) }
     }
 
     fun setScreenStreamActiveChangedListener(listener: ((Int, Boolean) -> Unit)?) {
@@ -192,7 +206,10 @@ class AndroidMediaSink(
         val existing = audioRenderers[type]
         if (existing?.format == format) return existing
         existing?.close()
-        return AudioRenderer(format, advancedAudioChannelMapping, navigationStreamType, mediaBufferMillis, onAudioDiagnostic).also { audioRenderers[type] = it }
+        return AudioRenderer(format, advancedAudioChannelMapping, navigationStreamType, mediaBufferMillis, onAudioDiagnostic).also {
+            audioRenderers[type] = it
+            if (format.audioType == "media") it.applyMediaGain(mediaGain)
+        }
     }
 }
 
@@ -554,7 +571,18 @@ private class AudioRenderer(
     private var underrunsAtPlaybackStart = 0
     private var lastPcmWriteNs = 0L
     private var rebufferCount = 0
+    private val gainLock = Any()
+    @Volatile private var mediaGain = 1f
     private val thread = Thread(::run, "carplay-audio").apply { isDaemon = true }
+
+    /** Music tracks only. The gain is kept if the [AudioTrack] does not exist yet. */
+    fun applyMediaGain(gain: Float) {
+        if (format.audioType != "media") return
+        synchronized(gainLock) {
+            mediaGain = gain
+            track?.let { setTrackGain(it, gain) }
+        }
+    }
 
     fun start() {
         if (started) return
@@ -703,7 +731,10 @@ private class AudioRenderer(
                 },
             )
         }
-        track = built
+        synchronized(gainLock) {
+            track = built
+            if (format.audioType == "media") setTrackGain(built, mediaGain)
+        }
         val capacityBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             built.bufferSizeInFrames * frameBytes
         } else {
@@ -944,6 +975,11 @@ private class AudioRenderer(
                 else -> return
             }
         }
+    }
+
+    private fun setTrackGain(track: AudioTrack, gain: Float) {
+        @Suppress("DEPRECATION")
+        runCatching { track.setStereoVolume(gain, gain) }
     }
 
     private fun writePcm(data: ByteArray, offset: Int = 0, length: Int = data.size) {
