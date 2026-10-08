@@ -1537,6 +1537,23 @@ class CarPlayHostActivity : ComponentActivity() {
             ).apply { topMargin = dp(46) },
         )
 
+        val restartApplicationButton = Button(this).apply {
+            text = getString(R.string.restart_application)
+            isAllCaps = false
+            textSize = 17f
+            setTextColor(MENU_BUTTON_TEXT)
+            ViewCompat.setBackgroundTintList(this, ColorStateList.valueOf(MENU_ACCENT))
+            minHeight = dp(52)
+            setOnClickListener { restartApplication() }
+        }
+        content.addView(
+            restartApplicationButton,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(12) },
+        )
+
         val exitApplicationButton = Button(this).apply {
             text = getString(R.string.exit_application)
             isAllCaps = false
@@ -3572,6 +3589,28 @@ class CarPlayHostActivity : ComponentActivity() {
             startAfterHandshakeReset = true
         } else {
             maybeStartCarPlay()
+        }
+    }
+
+    /**
+     * Restarts the app without terminating the process: the session is torn down exactly as
+     * [exitApplication] does, then the launcher activity is started into a cleared task. Because
+     * the process survives, the VPN permission is not requested again.
+     *
+     * The activity is deliberately left running until the relaunch: finishing it first would make
+     * the start a background activity launch, which newer releases refuse.
+     */
+    private fun restartApplication() {
+        if (shuttingDown.get()) return
+        val relaunch = packageManager.getLaunchIntentForPackage(packageName)
+        if (relaunch == null) {
+            exitApplication()
+            return
+        }
+        relaunch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        restoreSettingsBaseline()
+        shutdown(terminateProcess = false, reason = "settings restart application") {
+            applicationContext.startActivity(relaunch)
         }
     }
 

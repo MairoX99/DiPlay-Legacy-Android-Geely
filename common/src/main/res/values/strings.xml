@@ -190,6 +190,7 @@
     <string name="efficient_video">Efficient video</string>
     <string name="enable_the_car_s_bluetooth_and_pair_your_iphone_first">Enable the car’s Bluetooth and pair your iPhone first.</string>
     <string name="error">Error</string>
+    <string name="restart_application">RESTART APPLICATION</string>
     <string name="exit_application">EXIT APPLICATION</string>
     <string name="finish_setup_save_your_hotspot_details_to_use_this_mode">Finish setup · Save your hotspot details to use this mode.</string>
     <string name="follow_instrument_theme_and_map_card">Follow instrument theme and map card</string>

@@ -187,6 +187,7 @@
     <string name="efficient_video">Энергоэффективное видео</string>
     <string name="enable_the_car_s_bluetooth_and_pair_your_iphone_first">Сначала включите Bluetooth автомобиля и свяжите iPhone.</string>
     <string name="error">Ошибка</string>
+    <string name="restart_application">ПЕРЕЗАПУСТИТЬ ПРИЛОЖЕНИЕ</string>
     <string name="exit_application">ВЫЙТИ ИЗ ПРИЛОЖЕНИЯ</string>
     <string name="finish_setup_save_your_hotspot_details_to_use_this_mode">Завершить настройку · Сохраните данные точки доступа, чтобы использовать этот режим.</string>
     <string name="follow_instrument_theme_and_map_card">Следовать теме приборов и карточке карты</string>

@@ -187,6 +187,7 @@
     <string name="efficient_video">Vídeo eficiente</string>
     <string name="enable_the_car_s_bluetooth_and_pair_your_iphone_first">Activa primero el Bluetooth del coche y empareja tu iPhone.</string>
     <string name="error">Error</string>
+    <string name="restart_application">REINICIAR APLICACIÓN</string>
     <string name="exit_application">SALIR DE LA APLICACIÓN</string>
     <string name="finish_setup_save_your_hotspot_details_to_use_this_mode">Finalizar configuración · Guarda los datos de tu punto de acceso para usar este modo.</string>
     <string name="follow_instrument_theme_and_map_card">Seguir el tema del cuadro y la tarjeta del mapa</string>
