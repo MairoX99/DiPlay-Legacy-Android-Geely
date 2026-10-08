@@ -11,6 +11,45 @@ alignment line, not the base line, is what says how current a release is.
 
 ---
 
+## 0.3.5-geely-rc — 2026-10-08
+
+**Upstream alignment:** not re-checked for this release. The anchor is unchanged from 0.3.4:
+DiPlay `main` `5e58b4b` (2026-10-07), tag **v0.2.13**. The porting conclusions recorded there still
+apply.
+
+### Wired session
+
+- **A USB read that finishes as the timeout fires is kept.** On API < 26, `awaitUsbRequest`
+  cancels the request from a timer, and that cancel can race a transfer that already completed.
+  The timeout is thrown only when the deadline expired and the buffer is still empty. Wired iAP2
+  runs with acknowledgements disabled, so dropping that chunk would tear the mux down. The NCM
+  read still uses the untimed wait, so a timed-out request stays queued. Not verified on the car.
+- **A live NCM bulk-out failure ends the session after three in a row, and does not clear the
+  endpoint.** Before the phone has sent a frame, a failed bulk OUT is still the expected
+  pre-session NAK and is retried. After that, consecutive failures are counted and the session
+  fails at three. `CLEAR_FEATURE(ENDPOINT_HALT)` is not sent on those failures: it resets the data
+  toggle to DATA0 even when the endpoint was not halted, and Android's control transfer is not the
+  kernel halt-clear. Reopening the device still clears a real halt. Not verified on the car.
+
+### Connection
+
+- **Wireless CarPlay is offered on the E01 again.** The FS11GQJ gate is gone.
+  `loadWirelessEnabled` returns the stored preference (default true) instead of forcing it off.
+- **The default connection applies only when DiPlay opens by itself.** Last used, wireless, or USB.
+  Manual buttons still start the mode that was tapped. Auto-connect stays off unless the user turns
+  it on, and it still runs only on the first launch with no setup error, no background session, and
+  no page extra.
+- **The home screen lists the methods this head unit can call.** USB when the device has a USB host.
+  Car hotspot only when the Wi-Fi service, `setWifiApEnabled`, a Bluetooth adapter, a Bluetooth
+  state read, and `createRfcommSocketToServiceRecord` all answer, and Bluetooth is on. Wi-Fi Direct
+  only on Android 10 and later. If a call cannot be made, car hotspot is left off that line and the
+  reason is shown on the home screen, in connection setup, and in the in-session Wi-Fi settings.
+  Bluetooth merely off, or a missing Bluetooth permission, keeps the setup page and explains why.
+  The probe does not turn a radio on or open a socket. Not verified on the car. Wired USB is still
+  the only path proven on this car.
+
+---
+
 ## 0.3.4-geely-rc — 2026-10-08
 
 **Upstream alignment:** not re-checked for this release. The anchor is unchanged from 0.3.3:
