@@ -8,6 +8,11 @@ import android.hardware.usb.UsbRequest
 import android.os.Build
 import androidx.annotation.RequiresApi
 import java.nio.ByteBuffer
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal fun queueUsbRequest(request: UsbRequest, buffer: ByteBuffer): Boolean =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) request.queue(buffer)
@@ -19,6 +24,48 @@ internal fun queueUsbRequest(request: UsbRequest, buffer: ByteBuffer): Boolean =
 internal fun waitForUsbRequest(connection: UsbDeviceConnection, timeoutMillis: Long): UsbRequest? =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) connection.requestWait(timeoutMillis.coerceAtLeast(1))
     else connection.requestWait()
+
+/**
+ * Waits for [request] to complete, giving up after [timeoutMillis].
+ *
+ * The timed `requestWait` overload arrived with API 26. Below it the only overload blocks until the
+ * request completes or the connection closes, so a caller's deadline would otherwise be ignored and
+ * the wait could never end on a silent phone. On those releases the deadline is enforced here by
+ * cancelling [request] from a timer, the same unblocking `Iap2UsbSession.close` already uses.
+ *
+ * A cancelled request is consumed by the wait that reports the timeout, so an elapsed deadline
+ * throws [TimeoutException] with nothing left queued; [Iap2UsbSession] drains accordingly. Callers
+ * that keep a request queued across calls (the NCM read) must keep using [waitForUsbRequest].
+ */
+internal fun awaitUsbRequest(
+    connection: UsbDeviceConnection,
+    request: UsbRequest,
+    timeoutMillis: Long,
+): UsbRequest? {
+    val timeout = timeoutMillis.coerceAtLeast(1)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) return connection.requestWait(timeout)
+    val expired = AtomicBoolean(false)
+    val timer = usbRequestDeadlines.schedule(
+        {
+            expired.set(true)
+            request.cancel()
+        },
+        timeout,
+        TimeUnit.MILLISECONDS,
+    )
+    try {
+        val completed = connection.requestWait()
+        if (expired.get()) throw TimeoutException("Timed out waiting for a USB request")
+        return completed
+    } finally {
+        timer.cancel(false)
+    }
+}
+
+private val usbRequestDeadlines: ScheduledExecutorService =
+    Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "usb-request-deadline").apply { isDaemon = true }
+    }
 
 internal fun selectUsbConfiguration(
     connection: UsbDeviceConnection,

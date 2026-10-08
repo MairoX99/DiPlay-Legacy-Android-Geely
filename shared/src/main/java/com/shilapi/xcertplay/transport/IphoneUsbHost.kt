@@ -385,7 +385,7 @@ class Iap2UsbSession internal constructor(
                 throw IphoneUsbException.DeviceUnavailable("Android could not queue USBMUX read request")
             }
             val completed = try {
-                waitForUsbRequest(connection, timeoutMillis)
+                awaitUsbRequest(connection, request, timeoutMillis)
             } catch (_: TimeoutException) {
                 drainCancelledRead(request)
                 return@synchronized null
@@ -433,6 +433,11 @@ class Iap2UsbSession internal constructor(
     }
 
     private fun drainCancelledRead(request: UsbRequest) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            // The deadline timer in awaitUsbRequest cancelled this request, and the wait that
+            // reported the timeout consumed it. Nothing is left queued to drain.
+            return
+        }
         if (!request.cancel()) {
             throw failSession("Android could not cancel timed out USBMUX read request")
         }
