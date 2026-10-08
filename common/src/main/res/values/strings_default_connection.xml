@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_connection_mode">Default connection</string>
+    <string name="default_connection_last_used">Last used</string>
+    <string name="default_connection_wireless">Wireless</string>
+    <string name="default_connection_usb">USB</string>
+    <string name="default_connection_description">When DiPlay opens, use this plan and the selected iPhone. The connect buttons still use the mode you tap.</string>
+    <string name="connection_methods_supported">This device can use: %1$s</string>
+    <string name="connection_methods_none">This device has no usable connection method</string>
+    <string name="connection_block_no_wifi">Car hotspot is unavailable: there is no Wi-Fi service.</string>
+    <string name="connection_block_no_hotspot_api">Car hotspot is unavailable: this system has no hotspot switch.</string>
+    <string name="connection_block_no_bluetooth">Car hotspot is unavailable: the Bluetooth service cannot be called.</string>
+    <string name="connection_block_bluetooth_call">Car hotspot is unavailable: reading the Bluetooth state failed.</string>
+    <string name="connection_block_bluetooth_permission">Car hotspot needs the Bluetooth permission before its state can be read.</string>
+    <string name="connection_block_bluetooth_off">Turn Bluetooth on before the car hotspot can reach the iPhone. It is off.</string>
+    <string name="connection_block_no_rfcomm">Car hotspot is unavailable: this system has no Bluetooth data socket.</string>
+</resources>

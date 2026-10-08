@@ -1043,8 +1043,8 @@ class CarPlayHostActivity : ComponentActivity() {
             ).apply { topMargin = dp(14) },
         )
 
-        // Where the head unit cannot carry the wireless transport, the switch and the hotspot
-        // readout would only offer a connection its Bluetooth stack has no way to complete.
+        // The wireless switch stays available on every head unit. The hotspot section below
+        // says when a call it needs cannot be made; this switch is not a plan check.
         val hotspotStatusView: TextView? =
             if (WirelessCarPlay.uiOffered) menuText("", 16f, MENU_ACCENT) else null
         if (hotspotStatusView != null) {
@@ -2478,15 +2478,26 @@ class CarPlayHostActivity : ComponentActivity() {
             ),
         )
 
+        val report = DeviceConnectionSupport.inspect(this)
+        report.carHotspotNotes.forEach { blocker ->
+            section.addView(
+                menuText(carHotspotNote(blocker), 16f, Color.rgb(255, 196, 128)),
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(8) },
+            )
+        }
         val group = RadioGroup(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(8), 0, 0)
         }
-        val modes = buildList {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                add(WirelessHotspotMode.WIFI_P2P to getString(R.string.wi_fi_p2p_5_ghz))
+        val modes = report.wirelessModes.map { mode ->
+            mode to when (mode) {
+                WirelessHotspotMode.WIFI_P2P -> getString(R.string.wi_fi_p2p_5_ghz)
+                WirelessHotspotMode.MANUAL -> getString(R.string.built_in_car_hotspot)
+                WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.localonlyhotspot)
             }
-            add(WirelessHotspotMode.MANUAL to getString(R.string.built_in_car_hotspot))
         }
         var selectedId = View.NO_ID
         for ((mode, label) in modes) {
@@ -2690,6 +2701,16 @@ class CarPlayHostActivity : ComponentActivity() {
         manualHotspotErrorView?.text = error.orEmpty()
         manualHotspotErrorView?.visibility = if (error == null) View.GONE else View.VISIBLE
         return error == null
+    }
+
+    private fun carHotspotNote(blocker: CarHotspotBlocker): String = when (blocker) {
+        CarHotspotBlocker.NO_WIFI -> getString(R.string.connection_block_no_wifi)
+        CarHotspotBlocker.NO_HOTSPOT_API -> getString(R.string.connection_block_no_hotspot_api)
+        CarHotspotBlocker.NO_BLUETOOTH_ADAPTER -> getString(R.string.connection_block_no_bluetooth)
+        CarHotspotBlocker.BLUETOOTH_CALL_FAILED -> getString(R.string.connection_block_bluetooth_call)
+        CarHotspotBlocker.BLUETOOTH_PERMISSION -> getString(R.string.connection_block_bluetooth_permission)
+        CarHotspotBlocker.BLUETOOTH_OFF -> getString(R.string.connection_block_bluetooth_off)
+        CarHotspotBlocker.NO_RFCOMM -> getString(R.string.connection_block_no_rfcomm)
     }
 
     private fun hotspotModeLabel(mode: WirelessHotspotMode): String = when (mode) {

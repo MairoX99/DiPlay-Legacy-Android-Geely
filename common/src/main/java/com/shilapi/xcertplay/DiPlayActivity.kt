@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
@@ -138,7 +139,7 @@ class DiPlayActivity : ComponentActivity() {
             initialLaunch = false
             if (setupError == null && !CarPlayBackgroundSession.hasSession() &&
                 DiPlayPreferences.autoConnect(this) && intent.getStringExtra("page") == null) {
-                handler.post { connect(AirPlayPersistence.loadWirelessEnabled(this)) }
+                handler.post { connect(DiPlayPreferences.autoConnectWireless(this)) }
             }
         }
     }
@@ -177,13 +178,14 @@ class DiPlayActivity : ComponentActivity() {
         })
         left.addView(label(getString(R.string.a_familiar_drive), if (wide) 42 else 36, TEXT, true).apply { setPadding(0, dp(12), 0, dp(10)) })
         left.addView(label(getString(R.string.your_maps_music_and_conversations_carplay_right_here_on_yo), 19, MUTED))
-        val wireless = WirelessCarPlay.uiOffered
+        val wireless = deviceSupportsWireless()
         val card = card()
         card.addView(label(getString(if (wireless) R.string.wireless_carplay else R.string.connect_with_usb), 12, ACCENT, true).apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) letterSpacing = .12f
         })
         status = label(getString(R.string.ready_when_you_are), 24, TEXT, true).apply { setPadding(0, dp(10), 0, dp(16)) }
         card.addView(status)
+        card.addView(supportedConnectionLabel())
         connectButton = button(getString(R.string.connect_phone), true) {
             if (CarPlayBackgroundSession.hasSession()) openProjection()
             else connect(wireless)
@@ -219,8 +221,7 @@ class DiPlayActivity : ComponentActivity() {
             gravity = Gravity.CENTER
             addView(logo, LinearLayout.LayoutParams(dp(96), dp(96)))
         }
-        if (wireless) {
-            // The wireless card above already carries the USB call to action and its hint.
+        if (wireless && UsableConnection.USB in connectionReport().usable) {
             right.addView(button(getString(R.string.connect_with_usb), false) { connect(false) }, matchButton())
             right.addView(label(getString(R.string.plug_your_iphone_into_a_usb_data_port_allow_carplay_when_y), 14, MUTED).apply { gravity = Gravity.CENTER; setPadding(dp(8), dp(10), dp(8), dp(24)) })
         }
@@ -272,7 +273,15 @@ class DiPlayActivity : ComponentActivity() {
             card.addView(label(destination + getString(R.string.nothing_is_sent_automatically_protocol_payloads_and_creden), 14, MUTED).apply { setPadding(0, dp(12), 0, 0) })
         }
         section(content, getString(R.string.automatic_connection), R.drawable.ic_dp_automation) { card ->
-            toggle(card, getString(R.string.connect_when_diplay_opens), getString(R.string.use_your_last_connection_type_and_selected_iphone), DiPlayPreferences.autoConnect(this)) { DiPlayPreferences.saveAutoConnect(this, it) }
+            toggle(card, getString(R.string.connect_when_diplay_opens), getString(R.string.default_connection_description), DiPlayPreferences.autoConnect(this)) { DiPlayPreferences.saveAutoConnect(this, it) }
+            val connectionModes = DefaultConnectionMode.entries
+            choice(card, getString(R.string.default_connection_mode), listOf(
+                getString(R.string.default_connection_last_used),
+                getString(R.string.default_connection_wireless),
+                getString(R.string.default_connection_usb),
+            ), connectionModes.indexOf(DiPlayPreferences.defaultConnectionMode(this)), reconnects = false) {
+                DiPlayPreferences.saveDefaultConnectionMode(this, connectionModes[it])
+            }
             toggle(card, getString(R.string.open_after_the_car_starts), getString(R.string.availability_depends_on_your_head_unit_s_startup_settings), AirPlayPersistence.loadAutoStartOnBoot(this)) { AirPlayPersistence.saveAutoStartOnBoot(this, it) }
             card.addView(button("${getString(R.string.choose_iphone_prefix)}${DiPlayPreferences.phoneName(this)}", false) { choosePhone() }, matchButton(12, 60))
         }
@@ -446,7 +455,7 @@ class DiPlayActivity : ComponentActivity() {
             card.addView(label(getString(R.string.nearby_devices_connects_your_iphone_microphone_enables_sir), 16, MUTED))
             card.addView(button(getString(R.string.app_permissions), false) { openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }, matchButton(16, 60))
             card.addView(button(getString(R.string.bluetooth_settings), false) { openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }, matchButton(10, 60))
-            if (WirelessCarPlay.uiOffered) card.addView(button(getString(R.string.wireless_connection_help), false) { wirelessHelp() }, matchButton(10, 60))
+            if (deviceSupportsWireless()) card.addView(button(getString(R.string.wireless_connection_help), false) { wirelessHelp() }, matchButton(10, 60))
         }
         section(content, getString(R.string.about), R.drawable.ic_dp_about) { card ->
             card.addView(button(getString(R.string.about_diplay), false) { page = "about"; render() }, matchButton(0, 60))
@@ -507,11 +516,9 @@ class DiPlayActivity : ComponentActivity() {
     private fun connectionSetup(content: LinearLayout) {
         content.addView(label(getString(R.string.connection_setup), 34, TEXT, true))
         content.addView(label(getString(R.string.set_up_once_your_details_stay_saved_for_the_next_drive_cha), 17, MUTED).apply { setPadding(0, dp(8), 0, dp(24)) })
-        if (!WirelessCarPlay.uiOffered) {
-            // No wireless transport on this head unit, so the cable is the whole setup. Say why,
-            // because the wireless option every other head unit shows is simply absent here.
-            content.addView(label(getString(R.string.wireless_carplay_unavailable_no_bluetooth_data_channel), 16, MUTED).apply { setPadding(0, 0, 0, dp(16)) })
-            section(content, getString(R.string.connect_with_usb)) { card ->
+        content.addView(supportedConnectionLabel().apply { setPadding(0, 0, 0, dp(16)) })
+        if (!deviceSupportsWireless()) {
+            if (UsableConnection.USB in connectionReport().usable) section(content, getString(R.string.connect_with_usb)) { card ->
                 card.addView(label(getString(R.string.use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo), 16, MUTED))
                 card.addView(button(getString(R.string.connect_with_usb), false) { connect(false) }, matchButton(12, 60))
                 card.addView(button(getString(R.string.review_app_permissions), false) {
@@ -532,20 +539,19 @@ class DiPlayActivity : ComponentActivity() {
             card.addView(label(getString(R.string.return_from_car_settings_to_diplay_then_connect_accept_the), 16, MUTED))
             card.addView(button(getString(R.string.connect_phone), true) { connect(true) }, matchButton(12, 60))
         }
-        section(content, getString(R.string.prefer_a_cable)) { card ->
-            card.addView(label(getString(R.string.use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo), 16, MUTED))
-            card.addView(button(getString(R.string.connect_with_usb), false) { connect(false) }, matchButton(12, 60))
+        if (UsableConnection.USB in connectionReport().usable) {
+            section(content, getString(R.string.prefer_a_cable)) { card ->
+                card.addView(label(getString(R.string.use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo), 16, MUTED))
+                card.addView(button(getString(R.string.connect_with_usb), false) { connect(false) }, matchButton(12, 60))
+            }
         }
     }
 
     private fun wirelessLinkControls(parent: LinearLayout) {
         val mode = if (pendingCarHotspotSetup) WirelessHotspotMode.MANUAL else AirPlayPersistence.loadWirelessHotspotMode(this)
-        val modes = listOf(WirelessHotspotMode.MANUAL, WirelessHotspotMode.WIFI_P2P)
-        val titles = listOf(getString(R.string.built_in_car_hotspot), getString(R.string.wifi_direct))
-        val descriptions = listOf(
-            getString(R.string.hotspot_mode_manual_desc),
-            getString(R.string.hotspot_mode_p2p_desc)
-        )
+        val modes = connectionReport().wirelessModes
+        val titles = modes.map { wirelessModeTitle(it) }
+        val descriptions = modes.map { wirelessModeDescription(it) }
         val wide = resources.configuration.screenWidthDp >= 850
         val choices = if (wide) row().apply { gravity = Gravity.TOP } else column()
         parent.addView(choices)
@@ -802,6 +808,52 @@ class DiPlayActivity : ComponentActivity() {
         if (CarPlayBackgroundSession.hasSession()) CarPlayBackgroundSession.stop { runOnUiThread { open() } }
         else open()
     }
+    private fun connectionReport(): ConnectionSupportReport = DeviceConnectionSupport.inspect(this)
+
+    private fun deviceSupportsWireless(): Boolean = connectionReport().wirelessModes.isNotEmpty()
+
+    private fun supportedConnectionLabel(): TextView {
+        val report = connectionReport()
+        val usableText = if (report.usable.isEmpty()) {
+            getString(R.string.connection_methods_none)
+        } else {
+            getString(R.string.connection_methods_supported, report.usable.joinToString(" · ", transform = ::connectionMethodName))
+        }
+        val notes = report.carHotspotNotes.joinToString("\n", transform = ::carHotspotNote)
+        val text = if (notes.isEmpty()) usableText else "$usableText\n$notes"
+        return label(text, 15, if (report.usable.isEmpty() || notes.isNotEmpty()) WARNING else MUTED).apply {
+            setPadding(0, 0, 0, dp(12))
+        }
+    }
+
+    private fun carHotspotNote(blocker: CarHotspotBlocker): String = when (blocker) {
+        CarHotspotBlocker.NO_WIFI -> getString(R.string.connection_block_no_wifi)
+        CarHotspotBlocker.NO_HOTSPOT_API -> getString(R.string.connection_block_no_hotspot_api)
+        CarHotspotBlocker.NO_BLUETOOTH_ADAPTER -> getString(R.string.connection_block_no_bluetooth)
+        CarHotspotBlocker.BLUETOOTH_CALL_FAILED -> getString(R.string.connection_block_bluetooth_call)
+        CarHotspotBlocker.BLUETOOTH_PERMISSION -> getString(R.string.connection_block_bluetooth_permission)
+        CarHotspotBlocker.BLUETOOTH_OFF -> getString(R.string.connection_block_bluetooth_off)
+        CarHotspotBlocker.NO_RFCOMM -> getString(R.string.connection_block_no_rfcomm)
+    }
+
+    private fun connectionMethodName(connection: UsableConnection): String = when (connection) {
+        UsableConnection.USB -> getString(R.string.connect_with_usb)
+        UsableConnection.CAR_HOTSPOT -> getString(R.string.built_in_car_hotspot)
+        UsableConnection.WIFI_DIRECT -> getString(R.string.wifi_direct)
+    }
+
+    private fun wirelessModeTitle(mode: WirelessHotspotMode): String = when (mode) {
+        WirelessHotspotMode.MANUAL -> getString(R.string.built_in_car_hotspot)
+        WirelessHotspotMode.WIFI_P2P -> getString(R.string.wifi_direct)
+        WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.localonlyhotspot)
+    }
+
+    private fun wirelessModeDescription(mode: WirelessHotspotMode): String = when (mode) {
+        WirelessHotspotMode.MANUAL -> getString(R.string.hotspot_mode_manual_desc)
+        WirelessHotspotMode.WIFI_P2P -> getString(R.string.hotspot_mode_p2p_desc)
+        WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.hotspot_hint_local)
+    }
+
     private fun openProjection() {
         startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }

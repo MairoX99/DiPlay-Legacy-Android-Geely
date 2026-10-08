@@ -82,9 +82,9 @@ class NcmUsbBridge internal constructor(
             // The phone only sends once its data path is up, so from here a run of failures means bulk
             // OUT alone is gone: inbound video keeps arriving while touch, return audio and TCP ACKs
             // are dropped, and the user watches a frozen screen with no error. Android reports a NAK,
-            // a timeout and a latched endpoint halt with the same failed result, and a halt stays
-            // latched, so try to release one before counting this as a fault.
-            clearOutEndpointHalt()
+            // a timeout and a latched halt with the same failed result. CLEAR_FEATURE(ENDPOINT_HALT)
+            // also resets the data toggle when the endpoint was not halted, so a single NAK is not
+            // cleared here; three failures end the session and the reopen clears a real halt.
             consecutiveWriteFailures += 1
             Log.i(
                 IphoneCarPlayConfiguration.TAG,
@@ -294,14 +294,6 @@ class NcmUsbBridge internal constructor(
             if (failure == null) failure = error
         }
         return error
-    }
-
-    private fun clearOutEndpointHalt() {
-        val result = clearUsbEndpointHalt(connection, outEndpoint)
-        Log.i(
-            IphoneCarPlayConfiguration.TAG,
-            "ncm bulk-out failed; clear-halt on endpoint 0x${outEndpoint.address.toString(16)} returned $result",
-        )
     }
 
     private fun checkOpen() {
