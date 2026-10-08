@@ -3,6 +3,7 @@ package com.shilapi.xcertplay.transport
 import android.hardware.usb.UsbConfiguration
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbRequest
 import android.os.Build
@@ -34,12 +35,16 @@ internal fun waitForUsbRequest(connection: UsbDeviceConnection, timeoutMillis: L
  * cancelling [request] from a timer, the same unblocking `Iap2UsbSession.close` already uses.
  *
  * A cancelled request is consumed by the wait that reports the timeout, so an elapsed deadline
- * throws [TimeoutException] with nothing left queued; [Iap2UsbSession] drains accordingly. Callers
- * that keep a request queued across calls (the NCM read) must keep using [waitForUsbRequest].
+ * throws [TimeoutException] with nothing left queued; [Iap2UsbSession] drains accordingly. [buffer]
+ * must be the empty buffer [request] was queued with: below API 26 its position is what separates a
+ * completed transfer from a cancelled one, because the cancel can lose the race against a transfer
+ * that had already completed. Callers that keep a request queued across calls (the NCM read) must
+ * keep using [waitForUsbRequest].
  */
 internal fun awaitUsbRequest(
     connection: UsbDeviceConnection,
     request: UsbRequest,
+    buffer: ByteBuffer,
     timeoutMillis: Long,
 ): UsbRequest? {
     val timeout = timeoutMillis.coerceAtLeast(1)
@@ -55,7 +60,12 @@ internal fun awaitUsbRequest(
     )
     try {
         val completed = connection.requestWait()
-        if (expired.get()) throw TimeoutException("Timed out waiting for a USB request")
+        // A packet that completed as the deadline fired was already consumed from the phone, and the
+        // wired link runs with acknowledgements disabled, so discarding it here would tear the mux
+        // down over a read that actually succeeded. Only an empty buffer is a timeout.
+        if (expired.get() && buffer.position() == 0) {
+            throw TimeoutException("Timed out waiting for a USB request")
+        }
         return completed
     } finally {
         timer.cancel(false)
@@ -95,6 +105,38 @@ internal fun selectUsbInterface(connection: UsbDeviceConnection, usbInterface: U
         0,
         1_000,
     ) >= 0
+
+/**
+ * Clears a latched halt on [endpoint] after a failed bulk transfer.
+ *
+ * Android reports a stalled endpoint, a NAK and a timeout with the same failed result, and a USB
+ * stall stays latched per endpoint: every later transfer on it fails identically until something
+ * clears the halt. Re-opening the device clears it, which is why a full stack rebuild always
+ * recovers, so clearing it here keeps a single stalled transfer from looking like a dead endpoint.
+ * A control transfer is harmless when the endpoint was never halted.
+ */
+internal fun clearUsbEndpointHalt(
+    connection: UsbDeviceConnection,
+    endpoint: UsbEndpoint,
+    timeoutMillis: Int = USB_HALT_CLEAR_TIMEOUT_MILLIS,
+): Int = try {
+    connection.controlTransfer(
+        UsbConstants.USB_DIR_OUT or UsbConstants.USB_TYPE_STANDARD or USB_RECIP_ENDPOINT,
+        USB_REQUEST_CLEAR_FEATURE,
+        USB_FEATURE_ENDPOINT_HALT,
+        endpoint.address,
+        null,
+        0,
+        timeoutMillis,
+    )
+} catch (_: RuntimeException) {
+    -1
+}
+
+private const val USB_RECIP_ENDPOINT = 0x02
+private const val USB_REQUEST_CLEAR_FEATURE = 1
+private const val USB_FEATURE_ENDPOINT_HALT = 0
+private const val USB_HALT_CLEAR_TIMEOUT_MILLIS = 1_000
 
 @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 private fun selectUsbConfiguration21(connection: UsbDeviceConnection, value: Any?): Boolean =

@@ -385,7 +385,7 @@ class Iap2UsbSession internal constructor(
                 throw IphoneUsbException.DeviceUnavailable("Android could not queue USBMUX read request")
             }
             val completed = try {
-                awaitUsbRequest(connection, request, timeoutMillis)
+                awaitUsbRequest(connection, request, buffer, timeoutMillis)
             } catch (_: TimeoutException) {
                 drainCancelledRead(request)
                 return@synchronized null

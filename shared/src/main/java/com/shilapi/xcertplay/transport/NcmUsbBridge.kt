@@ -36,6 +36,8 @@ class NcmUsbBridge internal constructor(
     private var failure: IphoneUsbException? = null
     private var sequence = 0
     private var loggedWriteTimeout = false
+    @Volatile private var inboundFrameSeen = false
+    private var consecutiveWriteFailures = 0
     private val frames = ArrayDeque<ByteArray>()
     private var queuedBytes = 0
     private var buffered = ByteArray(0)
@@ -66,20 +68,42 @@ class NcmUsbBridge internal constructor(
         }
         val block = Ntb16Codec.build(frame, sequence)
         val transferred = connection.bulkTransfer(outEndpoint, block, block.size, timeoutMillis)
-        // Before StartCarPlaySession the phone keeps the NCM data path NAKed. Android reports the
-        // resulting timeout as -1; it is not a detach and later packets must be allowed to retry.
         if (transferred <= 0) {
-            if (!loggedWriteTimeout) {
-                loggedWriteTimeout = true
-                Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out not ready; retaining bridge for retry")
+            // Before StartCarPlaySession the phone keeps the NCM data path NAKed. That is not a detach
+            // and later packets must be allowed to retry, so a failure before the phone has sent
+            // anything is expected rather than a fault.
+            if (!inboundFrameSeen) {
+                if (!loggedWriteTimeout) {
+                    loggedWriteTimeout = true
+                    Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out not ready; retaining bridge for retry")
+                }
+                return@synchronized
+            }
+            // The phone only sends once its data path is up, so from here a run of failures means bulk
+            // OUT alone is gone: inbound video keeps arriving while touch, return audio and TCP ACKs
+            // are dropped, and the user watches a frozen screen with no error. Android reports a NAK,
+            // a timeout and a latched endpoint halt with the same failed result, and a halt stays
+            // latched, so try to release one before counting this as a fault.
+            clearOutEndpointHalt()
+            consecutiveWriteFailures += 1
+            Log.i(
+                IphoneCarPlayConfiguration.TAG,
+                "ncm bulk-out failed $consecutiveWriteFailures/$MAX_CONSECUTIVE_WRITE_FAILURES while the data path was live",
+            )
+            if (consecutiveWriteFailures >= MAX_CONSECUTIVE_WRITE_FAILURES) {
+                // USBMUX tears its whole session down for the same class of failure.
+                throw failSession(
+                    "NCM write failed $consecutiveWriteFailures times while the data path was live",
+                )
             }
             return@synchronized
         }
         if (transferred != block.size) {
-            throw IphoneUsbException.DeviceUnavailable(
-                "NCM write transferred $transferred of ${block.size} bytes",
-            )
+            // The phone holds a truncated NTB16 block, so this frame stream cannot be resumed in
+            // place; record the failure so the read side stops alongside this writer.
+            throw failSession("NCM write transferred $transferred of ${block.size} bytes")
         }
+        consecutiveWriteFailures = 0
         if (loggedWriteTimeout) {
             loggedWriteTimeout = false
             Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
@@ -204,6 +228,8 @@ class NcmUsbBridge internal constructor(
     }
 
     private fun enqueueFrame(frame: ByteArray) {
+        // Marks the point the phone's data path is up; the write side keys its failure policy off it.
+        inboundFrameSeen = true
         if (frames.size >= MAX_QUEUED_FRAMES || queuedBytes + frame.size > MAX_QUEUED_BYTES) {
             throw failSession("NCM frame queue exceeded its bounds")
         }
@@ -270,6 +296,14 @@ class NcmUsbBridge internal constructor(
         return error
     }
 
+    private fun clearOutEndpointHalt() {
+        val result = clearUsbEndpointHalt(connection, outEndpoint)
+        Log.i(
+            IphoneCarPlayConfiguration.TAG,
+            "ncm bulk-out failed; clear-halt on endpoint 0x${outEndpoint.address.toString(16)} returned $result",
+        )
+    }
+
     private fun checkOpen() {
         synchronized(stateLock) { checkOpenLocked() }
     }
@@ -295,6 +329,7 @@ class NcmUsbBridge internal constructor(
         private const val STATUS_POLL_INTERVAL_MILLIS = 500L
         private const val MAX_QUEUED_FRAMES = 256
         private const val MAX_QUEUED_BYTES = 1 shl 20
+        private const val MAX_CONSECUTIVE_WRITE_FAILURES = 3
         private const val NANOS_PER_MILLISECOND = 1_000_000L
 
         /** Claims and activates the NCM control/data interfaces; owns the connection on success. */
