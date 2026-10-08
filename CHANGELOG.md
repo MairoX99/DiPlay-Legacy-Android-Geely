@@ -11,6 +11,45 @@ alignment line, not the base line, is what says how current a release is.
 
 ---
 
+## 0.3.4-geely-rc — 2026-10-08
+
+**Upstream alignment:** not re-checked for this release. The anchor is unchanged from 0.3.3:
+DiPlay `main` `5e58b4b` (2026-10-07), tag **v0.2.13**. The porting conclusions recorded there still
+apply.
+
+### Wired connection
+
+- **The USB read timeout now works below API 26.** `UsbApiCompat.waitForUsbRequest` called the
+  untimed `requestWait()` on API < 26, so `Iap2UsbSession.read(timeoutMillis)` ignored its deadline
+  and `Iap2UsbMuxHost.begin()` could wait forever for a USBMUX version reply instead of failing
+  after 60 seconds. The new `awaitUsbRequest` keeps the timed overload on API 26+ and, below it,
+  cancels the request from a timer at the deadline — the same cross-thread unblocking `close()`
+  already relied on. The NCM read keeps the shape it needs, where a timed-out request stays queued.
+  Traced from the sibling `xikai6282/DiPlay-Geely-Android43` API18 patch. Not verified on the car.
+- **The wired session no longer captures the phone's syslog.** The `com.apple.syslog_relay` opened
+  after pairing shared the USBMUX pipe and its single reader thread with iAP2 control for two
+  minutes. It could never see `0x52`, which precedes it, and its PHONE lines no longer reach the
+  screen.
+
+### Connection screen
+
+- **Handshake steps and the USB bus are shown while connecting.** The connection screen carries a USB
+  device list refreshed every 2 seconds and a timestamped, 24-line handshake log, both split off the
+  existing `debugLog` stream; PHONE and TRACE lines still stay off the screen. The re-enumeration
+  path logs more: the `0x52` failure now names vid/pid/class and the configuration list, and the
+  controller records whether a CarPlay configuration was present and which reenum attempt it was. A
+  manual retry button starts a new handshake and cancels a pending automatic one.
+
+### Settings
+
+- **A "restart application" button.** It tears the session down exactly as exit does and relaunches
+  the launcher into a cleared task, without terminating the process — so the VPN permission is not
+  requested again. It deliberately leaves the activity running until the relaunch, which would
+  otherwise become a background activity launch that newer releases refuse. It lands on the
+  launcher, and unapplied setting edits are discarded, as with exit.
+
+---
+
 ## 0.3.3-geely-rc — 2026-10-07
 
 **Upstream alignment:** checked against DiPlay `main` `5e58b4b` (2026-10-07), 19 non-merge commits
