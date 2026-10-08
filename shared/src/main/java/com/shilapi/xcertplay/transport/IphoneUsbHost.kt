@@ -22,6 +22,21 @@ import java.util.concurrent.Executor
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 
+/** Short USB identity for handshake logs. Configuration listing needs API 21. */
+internal fun describeAppleUsbDevice(device: UsbDevice): String {
+    val configs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        (0 until device.configurationCount).joinToString(",") { index ->
+            val configuration = device.getConfiguration(index)
+            "${configuration.id}:${configuration.interfaceCount}"
+        }
+    } else {
+        "active-interfaces=${device.interfaceCount}"
+    }
+    return "vid=0x${device.vendorId.toString(16)} pid=0x${device.productId.toString(16)} " +
+        "class=${device.deviceClass}/${device.deviceSubclass}/${device.deviceProtocol} " +
+        "configs=$configs"
+}
+
 /** Exact Apple USB identities allowed by the deployment configuration. */
 class IphoneUsbMatcher private constructor(
     private val allowedDevices: Set<UsbDeviceId>?,
@@ -157,7 +172,10 @@ class IphoneUsbHost(
                 )
                 if (transferred != response.size) {
                     throw IphoneUsbException.Protocol(
-                        "CarPlay configuration request transferred $transferred of ${response.size} bytes",
+                        "usb/reenum vendor IN 0xC0 request 0x52 value 0 index 4 " +
+                            "transferred $transferred of ${response.size} bytes " +
+                            "timeout=${CONTROL_TRANSFER_TIMEOUT_MILLIS}ms " +
+                            describeAppleUsbDevice(device),
                     )
                 }
                 TransitionResult.ReenumerationRequested

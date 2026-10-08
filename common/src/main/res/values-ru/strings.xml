@@ -155,6 +155,10 @@
     <string name="connecting_to_your_iphone">Подключение к iPhone…</string>
     <string name="connection">Подключение</string>
     <string name="connection_interrupted_retrying">Соединение прервано. Повтор…</string>
+    <string name="handshake_steps">Шаги подключения</string>
+    <string name="usb_devices">USB-устройства</string>
+    <string name="usb_list_empty">На шине нет USB-устройств</string>
+    <string name="retry_connection">Повторить подключение</string>
     <string name="connection_setup">Настройка подключения</string>
     <string name="copied_to_the_car_clipboard_run_the_command_on_your_comput">Скопировано в буфер обмена автомобиля. Выполните команду на компьютере.</string>
     <string name="copy_command">Копировать команду</string>

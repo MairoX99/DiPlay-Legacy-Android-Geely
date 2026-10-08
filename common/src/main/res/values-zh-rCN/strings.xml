@@ -152,6 +152,10 @@
     <string name="connecting_to_your_iphone">正在连接 iPhone…</string>
     <string name="connection">连接</string>
     <string name="connection_interrupted_retrying">连接中断，正在重试…</string>
+    <string name="handshake_steps">握手步骤</string>
+    <string name="usb_devices">USB 设备</string>
+    <string name="usb_list_empty">总线上没有 USB 设备</string>
+    <string name="retry_connection">重新发起连接</string>
     <string name="connection_setup">连接设置</string>
     <string name="copied_to_the_car_clipboard_run_the_command_on_your_comput">已复制到车机剪贴板。在电脑上运行该命令。</string>
     <string name="copy_command">复制命令</string>

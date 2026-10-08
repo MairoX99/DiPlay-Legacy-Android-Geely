@@ -157,6 +157,10 @@
     <string name="connecting_to_your_iphone">Connecting to your iPhone…</string>
     <string name="connection">Connection</string>
     <string name="connection_interrupted_retrying">Connection interrupted. Retrying…</string>
+    <string name="handshake_steps">Handshake</string>
+    <string name="usb_devices">USB devices</string>
+    <string name="usb_list_empty">No USB devices on the bus</string>
+    <string name="retry_connection">Retry connection</string>
     <string name="connection_setup">Connection setup</string>
     <string name="copied_to_the_car_clipboard_run_the_command_on_your_comput">Copied to the car clipboard. Run the command on your computer.</string>
     <string name="copy_command">Copy command</string>

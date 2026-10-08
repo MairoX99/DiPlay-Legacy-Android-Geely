@@ -70,6 +70,7 @@ import com.shilapi.xcertplay.transport.IphoneCarPlayConfiguration
 import com.shilapi.xcertplay.transport.IphoneUsbException
 import com.shilapi.xcertplay.transport.IphoneUsbHost
 import com.shilapi.xcertplay.transport.IphoneUsbMatcher
+import com.shilapi.xcertplay.transport.describeAppleUsbDevice
 import com.shilapi.xcertplay.transport.LinuxI2cTransport
 import com.shilapi.xcertplay.transport.LockdownCarKitClient
 import com.shilapi.xcertplay.transport.LockdownPairingClient
@@ -1333,7 +1334,17 @@ class CarPlayController(
                 permissionPollGeneration++
                 when (phase) {
                     Phase.REENUMERATION, Phase.IPHONE -> {
-                        if (IphoneCarPlayConfiguration.find(result.device) != null) {
+                        val carPlay = IphoneCarPlayConfiguration.find(result.device)
+                        debugLog(
+                            if (carPlay != null) {
+                                "wired usb/config present id=${carPlay.id} " +
+                                    IphoneCarPlayConfiguration.describe(carPlay) +
+                                    " " + describeAppleUsbDevice(result.device)
+                            } else {
+                                "wired usb/config absent " + describeAppleUsbDevice(result.device)
+                            },
+                        )
+                        if (carPlay != null) {
                             openDataPaths(result.device)
                         } else if (reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS) {
                             beginReenumeration(result.device)
@@ -1385,6 +1396,10 @@ class CarPlayController(
     private fun beginReenumeration(device: UsbDevice) {
         phase = Phase.REENUMERATION
         reenumerationAttempts += 1
+        debugLog(
+            "wired usb/reenum attempt=$reenumerationAttempts/$MAXIMUM_REENUMERATION_ATTEMPTS " +
+                describeAppleUsbDevice(device),
+        )
         onStatus(CarPlayStatus.SelectingConfiguration)
         iphoneHost.requestCarPlayReenumerationAsync(device, executor) { transition ->
             when (transition) {

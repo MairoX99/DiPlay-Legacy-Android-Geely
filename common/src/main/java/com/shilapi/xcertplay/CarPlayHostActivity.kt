@@ -14,6 +14,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaCodecList
 import android.media.MediaFormat
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -257,6 +259,10 @@ class CarPlayHostActivity : ComponentActivity() {
     private var locationReportingSwitch: SwitchCompat? = null
     private var statusView: TextView? = null
     private var statusScrollView: ScrollView? = null
+    private var handshakeLogView: TextView? = null
+    private var handshakeScroll: ScrollView? = null
+    private var usbListView: TextView? = null
+    private var lastUsbList = ""
     private var stageStatusView: TextView? = null
     private var resolutionValueView: TextView? = null
     private var resolutionPreviewView: TextView? = null
@@ -334,6 +340,20 @@ class CarPlayHostActivity : ComponentActivity() {
     private var startAfterHandshakeReset = false
     private var restartGeneration = 0
     private var reconnectScheduled = false
+    private var reconnectEpoch = 0
+    private val handshakeLines = ArrayDeque<String>()
+    private val handshakeTimestamp = SimpleDateFormat("HH:mm:ss", Locale.US)
+    private val refreshUsbList: Runnable = Runnable {
+        if (shuttingDown.get()) return@Runnable
+        try {
+            publishUsbList()
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "usb list refresh failed", error)
+        }
+        if (!shuttingDown.get()) {
+            mainHandler.postDelayed(refreshUsbList, USB_LIST_INTERVAL_MILLIS)
+        }
+    }
     private var sessionLog: SessionLogFile? = null
     private var gestureSequenceActive = false
     private var gestureTracking = false
@@ -776,6 +796,7 @@ class CarPlayHostActivity : ComponentActivity() {
         dismissClusterPresentation()
         mainHandler.removeCallbacks(applyDisplaySize)
         mainHandler.removeCallbacks(expireOldLogLines)
+        mainHandler.removeCallbacks(refreshUsbList)
         currentSurface?.let { surface ->
             sink?.clearSurface(SCREEN_TYPE_MAIN, surface)
             sink?.clearSurface(SCREEN_TYPE_ALT, surface)
@@ -844,8 +865,62 @@ class CarPlayHostActivity : ComponentActivity() {
             text = if (wirelessEnabled) getString(R.string.keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow)
                 else getString(R.string.use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an)
             textSize = 17f; gravity = Gravity.CENTER; setTextColor(Color.rgb(168, 182, 202))
-            setPadding(0, dp(14), 0, dp(24))
+            setPadding(0, dp(14), 0, dp(8))
         })
+        panel.addView(TextView(this).apply {
+            text = getString(R.string.usb_devices)
+            textSize = 15f
+            setTextColor(Color.rgb(168, 182, 202))
+            setPadding(0, dp(8), 0, dp(4))
+        })
+        val usbText = TextView(this).apply {
+            textSize = 14f
+            typeface = Typeface.MONOSPACE
+            setTextColor(Color.rgb(186, 230, 196))
+            setLineSpacing(0f, 1.12f)
+            text = getString(R.string.usb_list_empty)
+        }
+        panel.addView(usbText, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        ))
+        usbListView = usbText
+        panel.addView(TextView(this).apply {
+            text = getString(R.string.handshake_steps)
+            textSize = 15f
+            setTextColor(Color.rgb(168, 182, 202))
+            setPadding(0, dp(8), 0, dp(4))
+        })
+        val handshakeText = TextView(this).apply {
+            textSize = 14f
+            typeface = Typeface.MONOSPACE
+            setTextColor(Color.rgb(186, 230, 196))
+            setLineSpacing(0f, 1.12f)
+        }
+        val handshake = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = true
+            addView(handshakeText, ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+        panel.addView(handshake, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(132),
+        ).apply { bottomMargin = dp(12) })
+        handshakeLogView = handshakeText
+        handshakeScroll = handshake
+        panel.addView(Button(this).apply {
+            text = getString(R.string.retry_connection)
+            isAllCaps = false
+            textSize = 18f
+            setTextColor(Color.rgb(12, 17, 27))
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(127, 205, 154))
+                cornerRadius = dp(20).toFloat()
+            }
+            setOnClickListener { retryConnectionNow() }
+        }, LinearLayout.LayoutParams(dp(300), dp(64)).apply { bottomMargin = dp(12) })
         panel.addView(Button(this).apply {
             text = getString(R.string.reset_carplay_wi_fi); isAllCaps = false; textSize = 18f
             visibility = View.GONE
@@ -862,13 +937,72 @@ class CarPlayHostActivity : ComponentActivity() {
             text = getString(R.string.in_carplay_swipe_down_with_three_fingers_to_open_diplay_se)
             textSize = 13f; gravity = Gravity.CENTER; setTextColor(Color.rgb(168, 182, 202)); setPadding(0, dp(20), 0, 0)
         })
-        root.addView(panel, FrameLayout.LayoutParams(-1, -1))
+        val panelScroller = ScrollView(this).apply {
+            isFillViewport = true
+            addView(panel, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+        root.addView(panelScroller, FrameLayout.LayoutParams(-1, -1))
         videoView = video
         gestureOverlay = gestureLayer
         stageStatusView = stage
-        connectionPanel = panel
+        connectionPanel = panelScroller
         updateDebugOverlays()
+        mainHandler.post(refreshUsbList)
         return root
+    }
+
+    /** Replaces the on-screen USB list. A changed bus is also written into the handshake log. */
+    private fun publishUsbList() {
+        val manager = getSystemService(Context.USB_SERVICE) as? UsbManager ?: return
+        val devices = manager.deviceList.values.sortedBy { it.deviceName }
+        val body = if (devices.isEmpty()) {
+            getString(R.string.usb_list_empty)
+        } else {
+            devices.joinToString("\n") { device ->
+                try {
+                    usbListLine(device)
+                } catch (error: Exception) {
+                    "${device.deviceName}  unreadable ${error.javaClass.simpleName}"
+                }
+            }
+        }
+        usbListView?.text = body
+        if (body == lastUsbList) return
+        lastUsbList = body
+        for (line in body.lineSequence()) {
+            val logged = "usb/list $line"
+            showHandshakeLine(logged)
+            appendLog(logged)
+        }
+    }
+
+    private fun usbListLine(device: UsbDevice): String {
+        val configs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            (0 until device.configurationCount).joinToString(",") { index ->
+                val configuration = device.getConfiguration(index)
+                "${configuration.id}:${configuration.interfaceCount}"
+            }
+        } else {
+            "if=${device.interfaceCount}"
+        }
+        val label = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) device.productName else null
+        } catch (_: Exception) {
+            null
+        } ?: if (device.vendorId == 0x05ac) "Apple" else null
+        return UsbBusFormat.line(
+            deviceName = device.deviceName,
+            vendorId = device.vendorId,
+            productId = device.productId,
+            deviceClass = device.deviceClass,
+            deviceSubclass = device.deviceSubclass,
+            deviceProtocol = device.deviceProtocol,
+            configs = configs,
+            productLabel = label,
+        )
     }
 
     private fun buildSettingsMenu(): View {
@@ -3075,14 +3209,17 @@ class CarPlayHostActivity : ComponentActivity() {
             override fun onDebugLog(message: String) {
                 // "TRACE ", "PHONE ", and multiline text are dropped on purpose.
                 // Protocol payloads are not written to the session file, so the old
-                // TRACE file branch could never run.
-                if (DiagnosticRedactor.redact(message) == null) return
+                // TRACE file branch could never run. Drop them before the main thread.
+                val redacted = DiagnosticRedactor.redact(message)
+                val handshake = HandshakeLog.displayLine(message)
+                if (redacted == null && handshake == null) return
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration) {
                         return@runOnUiThread
                     }
+                    if (handshake != null && !menuOpen) showHandshakeLine(handshake)
+                    if (redacted == null || menuOpen) return@runOnUiThread
                     DisplayDiagnosticSnapshot.record(this@CarPlayHostActivity, displayDiagnosticAttempt, message)
-                    if (menuOpen) return@runOnUiThread
                     appendLog(message)
                 }
             }
@@ -3331,6 +3468,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (reconnectScheduled) return
         reconnectScheduled = true
         val generation = restartGeneration
+        val epoch = reconnectEpoch
         val delayMillis = if (reason.contains("AirPlay iAP tunnel", ignoreCase = true)) {
             IAP_TUNNEL_RECONNECT_DELAY_MILLIS
         } else {
@@ -3338,6 +3476,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         reconnectAttempts += 1
         appendLog("$reason; retrying in ${delayMillis}ms")
+        showHandshakeLine("$reason; automatic retry in ${delayMillis}ms")
         mainHandler.postDelayed(
             {
                 reconnectScheduled = false
@@ -3345,7 +3484,8 @@ class CarPlayHostActivity : ComponentActivity() {
                     shuttingDown.get() ||
                     menuOpen ||
                     handshakeResetInProgress ||
-                    generation != restartGeneration
+                    generation != restartGeneration ||
+                    epoch != reconnectEpoch
                 ) {
                     return@postDelayed
                 }
@@ -3377,9 +3517,15 @@ class CarPlayHostActivity : ComponentActivity() {
             oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS)
             oldSink?.close()
             runOnUiThread {
-                if (!shuttingDown.get() && generation == restartGeneration) {
+                val queued = startAfterHandshakeReset
+                startAfterHandshakeReset = false
+                if (shuttingDown.get()) return@runOnUiThread
+                if (generation == restartGeneration) {
                     handshakeResetInProgress = false
                     startCarPlay(size)
+                } else if (queued) {
+                    handshakeResetInProgress = false
+                    maybeStartCarPlay()
                 }
             }
         }
@@ -3571,31 +3717,55 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun setConnectionStage(message: String) {
         latestStage = message
-        stageStatusView?.text = friendlyStage(message)
+        stageStatusView?.text = message
+        showHandshakeLine(message)
         updateDebugOverlays()
+    }
+
+    /** Starts a new phone handshake now and cancels a pending automatic retry. */
+    private fun retryConnectionNow() {
+        if (shuttingDown.get() || menuOpen) return
+        if (controller != null && !CarPlayBackgroundSession.isOwner(this)) return
+        reconnectEpoch += 1
+        reconnectScheduled = false
+        reconnectAttempts = 0
+        showHandshakeLine("manual retry: start a new handshake")
+        appendLog("manual retry: start a new handshake")
+        if (handshakeResetInProgress) {
+            startAfterHandshakeReset = true
+            showHandshakeLine("manual retry: queued until the current reset finishes")
+            return
+        }
+        val size = activeDisplaySize
+        if (controller == null) {
+            val transportReady = if (wirelessEnabled) wirelessPermissionsReady else vpnReady
+            val locationReady = !locationReportingEnabled || locationPermissionAvailable
+            when {
+                size == null -> showHandshakeLine("manual retry: display size is not ready")
+                !transportReady -> showHandshakeLine("manual retry: waiting for VPN or wireless permission")
+                !locationReady -> showHandshakeLine("manual retry: waiting for location permission")
+                !microphonePermissionResolved -> showHandshakeLine("manual retry: waiting for microphone permission")
+                else -> startCarPlay(size)
+            }
+            maybeStartCarPlay()
+            return
+        }
+        restartCarPlay("Manual retry")
+    }
+
+    private fun showHandshakeLine(message: String) {
+        val line = HandshakeLog.displayLine(message) ?: return
+        val stamped = "${handshakeTimestamp.format(Date())}  $line"
+        if (handshakeLines.lastOrNull() == stamped) return
+        handshakeLines.addLast(stamped)
+        while (handshakeLines.size > HandshakeLog.MAX_LINES) handshakeLines.removeFirst()
+        handshakeLogView?.text = handshakeLines.joinToString("\n")
+        handshakeScroll?.post { handshakeScroll?.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun updateDebugOverlays() {
         statusScrollView?.visibility = View.GONE
         connectionPanel?.visibility = if (activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
-    }
-
-    private fun friendlyStage(message: String): String = when {
-        message.contains("Turn on Wi-Fi", true) -> getString(R.string.turn_on_wi_fi_in_the_head_unit_s_settings_to_connect)
-        message.contains("Allow precise Location", true) -> getString(R.string.allow_precise_location_for_diplay_in_the_head_unit_s_app_p)
-        message.contains("Allow Nearby devices", true) -> getString(R.string.allow_nearby_devices_for_diplay_in_the_head_unit_s_app_per)
-        message.contains("createGroup failed", true) -> getString(R.string.the_head_unit_couldn_t_start_carplay_wi_fi_check_wi_fi_and)
-        message.contains("needs a reset", true) -> getString(R.string.a_previous_wi_fi_direct_connection_is_still_running_reset)
-        message.contains("socket", true) || message.contains("RFCOMM", true) -> getString(R.string.your_iphone_isn_t_available_unlock_it_and_check_bluetooth)
-        message.contains("unsupported", true) || message.contains("not supported", true) -> getString(R.string.this_head_unit_may_not_support_wireless_carplay_try_a_usb)
-        message.contains("denied", true) || message.contains("permission", true) -> getString(R.string.allow_the_connection_permission_to_continue)
-        message.contains("Failed", true) || message.contains("error", true) -> getString(R.string.connection_interrupted_retrying)
-        message.contains("Waiting for iPhone", true) || message.contains("Discovering iPhone", true) -> getString(R.string.connect_your_iphone_with_a_usb_cable)
-        message.contains("paired", true) -> getString(R.string.looking_for_your_paired_iphone)
-        message.contains("Bluetooth", true) -> getString(R.string.connecting_to_your_iphone)
-        message.contains("reconnect", true) || message.contains("ended", true) -> getString(R.string.reconnecting_to_your_iphone)
-        message.contains("active", true) || message.contains("running", true) -> getString(R.string.opening_carplay)
-        else -> getString(R.string.getting_carplay_ready)
     }
 
     private fun appendLog(message: String) {
@@ -3709,6 +3879,7 @@ class CarPlayHostActivity : ComponentActivity() {
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val RECONNECT_DELAY_MILLIS = 2_000L
+        const val USB_LIST_INTERVAL_MILLIS = 2_000L
         const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L
         const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L
         const val SESSION_LOG_DRAIN_TIMEOUT_MILLIS = 500L

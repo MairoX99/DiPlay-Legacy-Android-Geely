@@ -155,6 +155,10 @@
     <string name="connecting_to_your_iphone">جارٍ الاتصال بـ iPhone…</string>
     <string name="connection">الاتصال</string>
     <string name="connection_interrupted_retrying">انقطع الاتصال. إعادة المحاولة…</string>
+    <string name="handshake_steps">خطوات الاتصال</string>
+    <string name="usb_devices">أجهزة USB</string>
+    <string name="usb_list_empty">لا توجد أجهزة USB على الناقل</string>
+    <string name="retry_connection">إعادة الاتصال</string>
     <string name="connection_setup">إعداد الاتصال</string>
     <string name="copied_to_the_car_clipboard_run_the_command_on_your_comput">تم النسخ إلى حافظة السيارة. نفّذ الأمر على حاسوبك.</string>
     <string name="copy_command">نسخ الأمر</string>
