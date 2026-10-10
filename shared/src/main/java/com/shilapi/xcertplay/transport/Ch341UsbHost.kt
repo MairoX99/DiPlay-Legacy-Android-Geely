@@ -12,7 +12,7 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import java.io.Closeable
 import java.util.concurrent.Executor
 
@@ -174,7 +174,7 @@ class Ch341UsbSession internal constructor(
     internal fun bulkWrite(data: ByteArray, timeoutMillis: Int) {
         val transferred = transfer(outputEndpoint, data, timeoutMillis, "write")
         if (transferred != data.size) {
-            Log.w(TAG, "bulk write sent $transferred of ${data.size} bytes: ${data.toHexPreview()}")
+            DiagLog.w(TAG, "bulk write sent $transferred of ${data.size} bytes: ${data.toHexPreview()}")
             throw I2cTransportException.Protocol(
                 "CH341 bulk write transferred $transferred of ${data.size} bytes",
             )
@@ -222,7 +222,7 @@ class Ch341UsbSession internal constructor(
                 // The answer ended early: fewer status bytes than the worst case, or a packet the
                 // controller does not answer at all.
                 if (offset > 0 || allowEmpty) {
-                    Log.d(
+                    DiagLog.d(
                         TAG,
                         "bulk read ended early at $offset of $maxLength bytes " +
                             "(quiet-packet timeout of ${waitMillis}ms; accepted as end of answer)",
@@ -242,7 +242,7 @@ class Ch341UsbSession internal constructor(
             // The answer was shorter than the worst-case length the transport budgeted for: the
             // controller returned fewer status bytes than it had written bytes, or the stream
             // framing drifted off a packet boundary. Both are worth seeing in logcat.
-            Log.d(TAG, "bulk read answered $offset of $maxLength bytes (allowEmpty=$allowEmpty)")
+            DiagLog.d(TAG, "bulk read answered $offset of $maxLength bytes (allowEmpty=$allowEmpty)")
         }
         return data.copyOf(offset)
     }
@@ -307,10 +307,10 @@ class Ch341UsbSession internal constructor(
                 RECOVERY_TIMEOUT_MILLIS,
             )
         } catch (error: RuntimeException) {
-            Log.w(TAG, "halt clear on endpoint ${endpoint.address} threw after failed bulk $operation", error)
+            DiagLog.w(TAG, "halt clear on endpoint ${endpoint.address} threw after failed bulk $operation", error)
             -1
         }
-        Log.w(TAG, "bulk $operation failed; halt clear on endpoint ${endpoint.address} returned $result")
+        DiagLog.w(TAG, "bulk $operation failed; halt clear on endpoint ${endpoint.address} returned $result")
     }
 
     private fun ByteArray.toHexPreview(): String = joinToString(" ") { "%02x".format(it) }

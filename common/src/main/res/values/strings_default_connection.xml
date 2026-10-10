@@ -2,7 +2,6 @@
 <resources>
     <string name="default_connection_mode">Default connection</string>
     <string name="default_connection_last_used">Last used</string>
-    <string name="default_connection_wireless">Wireless</string>
     <string name="default_connection_usb">USB</string>
     <string name="default_connection_description">When DiPlay opens, use this plan and the selected iPhone. The connect buttons still use the mode you tap.</string>
     <string name="connection_methods_supported">This device can use: %1$s</string>

@@ -5,6 +5,9 @@
 #   DIPLAY_AUTH_ASSETS_DIR   default ~/.diplay-auth-assets    (offline-mfi identity)
 #   ~/.diplay-signing/        keystore.properties + the release keystore
 #
+# DIPLAY_CLOUD_LOGS=0 drops the Supabase log-upload key from the APK. A run in CI always gets 0;
+# a run here gets 1 unless the caller says otherwise.
+#
 # Usage: scripts/package-geely.sh [release|debug|both]   (default: release)
 set -eu
 
@@ -20,6 +23,15 @@ tag="V$(printf '%s' "$version" | tr -d '.')"
 : "${ANDROID_HOME:=/opt/homebrew/share/android-commandlinetools}"
 : "${DIPLAY_AUTH_ASSETS_DIR:=$HOME/.diplay-auth-assets}"
 export ANDROID_HOME DIPLAY_AUTH_ASSETS_DIR
+
+# A build made from git is the one that gets published, and it must not carry the log-upload key: a CI
+# workspace is a checkout, so whatever a local.properties lying in it says is not what is being
+# released. GitHub sets CI for every step; a local compile sets neither, keeps the key, and keeps the
+# on-device "generate and upload report" button working for the runs that need it.
+if [ -n "${CI:-}${GITHUB_ACTIONS:-}" ]; then
+    DIPLAY_CLOUD_LOGS=0
+fi
+export DIPLAY_CLOUD_LOGS="${DIPLAY_CLOUD_LOGS:-1}"
 
 [ -f "$DIPLAY_AUTH_ASSETS_DIR/offline-mfi/identity.pk8" ] || {
     echo "package-geely: $DIPLAY_AUTH_ASSETS_DIR/offline-mfi/identity.pk8 is missing" >&2; exit 1; }

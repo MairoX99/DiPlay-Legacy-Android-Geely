@@ -5,7 +5,7 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbRequest
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.ArrayDeque
@@ -75,7 +75,7 @@ class NcmUsbBridge internal constructor(
             if (!inboundFrameSeen) {
                 if (!loggedWriteTimeout) {
                     loggedWriteTimeout = true
-                    Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out not ready; retaining bridge for retry")
+                    DiagLog.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out not ready; retaining bridge for retry")
                 }
                 return@synchronized
             }
@@ -86,7 +86,7 @@ class NcmUsbBridge internal constructor(
             // also resets the data toggle when the endpoint was not halted, so a single NAK is not
             // cleared here; three failures end the session and the reopen clears a real halt.
             consecutiveWriteFailures += 1
-            Log.i(
+            DiagLog.i(
                 IphoneCarPlayConfiguration.TAG,
                 "ncm bulk-out failed $consecutiveWriteFailures/$MAX_CONSECUTIVE_WRITE_FAILURES while the data path was live",
             )
@@ -106,7 +106,7 @@ class NcmUsbBridge internal constructor(
         consecutiveWriteFailures = 0
         if (loggedWriteTimeout) {
             loggedWriteTimeout = false
-            Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
+            DiagLog.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
         }
     }
 
@@ -183,7 +183,7 @@ class NcmUsbBridge internal constructor(
             }
             if (!loggedFirst) {
                 loggedFirst = true
-                Log.i(
+                DiagLog.i(
                     IphoneCarPlayConfiguration.TAG,
                     "ncm status notification bytes=$transferred data=${buffer.copyOf(transferred).hex(32)}",
                 )
@@ -329,7 +329,7 @@ class NcmUsbBridge internal constructor(
             val claimed = ArrayList<UsbInterface>(2)
             try {
                 val descriptorHostMac = readNcmHostMac(connection, function.control.id)
-                Log.i(
+                DiagLog.i(
                     IphoneCarPlayConfiguration.TAG,
                     "ncm descriptor hostMac=${descriptorHostMac?.macString() ?: "unavailable"}",
                 )
@@ -338,7 +338,7 @@ class NcmUsbBridge internal constructor(
                 val sameInterface = function.control.id == function.data.id
                 val first = if (sameInterface) function.data else function.control
                 val firstClaimed = connection.claimInterface(first, true)
-                Log.i(
+                DiagLog.i(
                     IphoneCarPlayConfiguration.TAG,
                     "claim iface=${first.id}/${IphoneCarPlayConfiguration.alternateSetting(first)} class=${first.interfaceClass}" +
                         " subclass=${first.interfaceSubclass} proto=${first.interfaceProtocol} ok=$firstClaimed",
@@ -351,7 +351,7 @@ class NcmUsbBridge internal constructor(
                 claimed.add(first)
                 if (!sameInterface) {
                     val dataClaimed = connection.claimInterface(function.data, true)
-                    Log.i(
+                    DiagLog.i(
                         IphoneCarPlayConfiguration.TAG,
                         "claim iface=${function.data.id}/${IphoneCarPlayConfiguration.alternateSetting(function.data)}" +
                             " class=${function.data.interfaceClass} ok=$dataClaimed",
@@ -364,7 +364,7 @@ class NcmUsbBridge internal constructor(
                     claimed.add(function.data)
                 }
                 val altSelected = selectUsbInterface(connection, function.data)
-                Log.i(
+                DiagLog.i(
                     IphoneCarPlayConfiguration.TAG,
                     "setInterface iface=${function.data.id}/${IphoneCarPlayConfiguration.alternateSetting(function.data)} ok=$altSelected",
                 )
@@ -373,7 +373,7 @@ class NcmUsbBridge internal constructor(
                         "Android could not select the NCM data alternate setting",
                     )
                 }
-                Log.i(
+                DiagLog.i(
                     IphoneCarPlayConfiguration.TAG,
                     "ncm status endpoint=${function.statusIn?.address?.let { "0x${it.toString(16)}" } ?: "none"}",
                 )

@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.SystemClock
+import com.shilapi.xcertplay.carhop.CarBluetoothHops
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import java.util.UUID
 
@@ -41,6 +43,9 @@ internal data class HeadUnitProbe(
     val hotspotApi: Boolean,
     val bluetooth: BluetoothRead,
     val rfcommSocket: Boolean,
+    val adapterRfcomm: Boolean = false,
+    /** A hop this build supplies carries the Bluetooth leg, on a head unit whose own stack cannot. */
+    val vendorHopRfcomm: Boolean = false,
 )
 
 internal data class ConnectionSupportReport(
@@ -54,27 +59,36 @@ internal object DeviceConnectionSupport {
         val notes = mutableListOf<CarHotspotBlocker>()
         if (!probe.wifiManager) notes += CarHotspotBlocker.NO_WIFI
         else if (!probe.hotspotApi) notes += CarHotspotBlocker.NO_HOTSPOT_API
-        val bluetoothCallable = when (probe.bluetooth) {
+        // With an adapter or a supplied hop carrying the Bluetooth leg, the car's own stack being absent,
+        // blocked or unable to open an RFCOMM socket is no longer a reason the hotspot cannot work — and
+        // these notes are rendered as warnings under the option, so saying so next to a working choice
+        // would be wrong.
+        val vendorNotesApply = !probe.adapterRfcomm && !probe.vendorHopRfcomm
+        val vendorBluetoothCallable = when (probe.bluetooth) {
             BluetoothRead.MISSING -> {
-                notes += CarHotspotBlocker.NO_BLUETOOTH_ADAPTER
+                if (vendorNotesApply) notes += CarHotspotBlocker.NO_BLUETOOTH_ADAPTER
                 false
             }
             BluetoothRead.FAILED -> {
-                notes += CarHotspotBlocker.BLUETOOTH_CALL_FAILED
+                if (vendorNotesApply) notes += CarHotspotBlocker.BLUETOOTH_CALL_FAILED
                 false
             }
             BluetoothRead.DENIED -> {
-                notes += CarHotspotBlocker.BLUETOOTH_PERMISSION
+                if (vendorNotesApply) notes += CarHotspotBlocker.BLUETOOTH_PERMISSION
                 true
             }
             BluetoothRead.OFF, BluetoothRead.ON -> {
-                if (!probe.rfcommSocket) notes += CarHotspotBlocker.NO_RFCOMM
+                if (!probe.rfcommSocket && vendorNotesApply) notes += CarHotspotBlocker.NO_RFCOMM
                 probe.rfcommSocket
             }
         }
-        if (bluetoothCallable && probe.bluetooth == BluetoothRead.OFF) notes += CarHotspotBlocker.BLUETOOTH_OFF
+        // A USB Bluetooth adapter, or the hop this head unit supplies, carries the RFCOMM leg the
+        // vendor stack does not.
+        val bluetoothCallable = vendorBluetoothCallable || probe.adapterRfcomm || probe.vendorHopRfcomm
+        if (vendorBluetoothCallable && probe.bluetooth == BluetoothRead.OFF) notes += CarHotspotBlocker.BLUETOOTH_OFF
         val callsAnswer = probe.wifiManager && probe.hotspotApi && bluetoothCallable
-        val radioReady = callsAnswer && probe.bluetooth == BluetoothRead.ON
+        val radioReady = callsAnswer &&
+            (probe.bluetooth == BluetoothRead.ON || probe.adapterRfcomm || probe.vendorHopRfcomm)
         val usable = buildList {
             if (probe.usbHost) add(UsableConnection.USB)
             if (radioReady) {
@@ -110,6 +124,8 @@ internal object DeviceConnectionSupport {
             hotspotApi = wifi != null && hotspotSwitchExists(),
             bluetooth = bluetooth,
             rfcommSocket = rfcommSocketExists(),
+            adapterRfcomm = UsbBluetoothRadios.present(context),
+            vendorHopRfcomm = vendorHopRfcomm(context),
         )
     }
 
@@ -124,4 +140,26 @@ internal object DeviceConnectionSupport {
     private fun rfcommSocketExists(): Boolean = runCatching {
         BluetoothDevice::class.java.getMethod("createRfcommSocketToServiceRecord", UUID::class.java)
     }.isSuccess
+
+    /**
+     * Whether the hop this build supplies is worth offering: it is for this head unit and could start.
+     *
+     * Answering costs a round trip that forks a process on the head unit, and the connection page asks
+     * this on every redraw — during layout, where a wedged service would park the page. A few seconds of
+     * staleness is invisible next to that.
+     */
+    private fun vendorHopRfcomm(context: Context): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (now - vendorHopProbeAt < VENDOR_HOP_PROBE_TTL_MILLIS) return vendorHopAvailable
+        vendorHopAvailable = runCatching {
+            val hop = CarBluetoothHops.active
+            hop != null && hop.applies(context) && hop.ready(context)
+        }.getOrDefault(false)
+        vendorHopProbeAt = now
+        return vendorHopAvailable
+    }
+
+    private const val VENDOR_HOP_PROBE_TTL_MILLIS = 5_000L
+    private var vendorHopProbeAt = 0L
+    private var vendorHopAvailable = false
 }

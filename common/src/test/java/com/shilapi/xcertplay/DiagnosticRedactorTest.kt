@@ -20,13 +20,58 @@ class DiagnosticRedactorTest {
             assertTrue(report.contains(video))
         } finally { folder.deleteRecursively() }
     }
-    @Test fun payloadAndCredentialLinesNeverReachReports() {
-        for (line in listOf("TRACE IAP2 tx key", "hotspot passphrase=secret", "token=secret", "certificate bytes=607", "rx body={phone: 'Jane'}", "ok\nsecret", "wifi ssid=Home", "wireless name=Jane Smith’s iPhone")) {
+    /** Protocol payloads and multi-line text are not evidence; they are dropped outright. */
+    @Test fun protocolPayloadsAndMultilineTextAreDroppedOutright() {
+        for (line in listOf("TRACE IAP2 tx key", "PHONE rx", "ok\nsecret")) {
             assertNull(line, DiagnosticRedactor.redact(line))
         }
     }
-    @Test fun stateTransitionsSurviveWithoutAddressesOrIdentifiers() {
-        val line = DiagnosticRedactor.redact("connected peer=C0:A6:00:29:58:0A ip=192.168.31.71 id=0123456789abcdef0123456789abcdef ipv6=fe80::1234:5678:abcd:9%p2p0")!!
+
+    /**
+     * A line that carries a credential says so instead of vanishing. Returning null made a withheld
+     * line and an absent one the same thing, so "the certificate was rejected" — a sentence about the
+     * failure, with no value in it — was dropped for the keyword alone and the report read as if the
+     * step had never run.
+     */
+    @Test fun aCredentialLineIsFlaggedNotSilentlyVanished() {
+        for (line in listOf("hotspot passphrase=secret", "token=secret", "certificate bytes=607", "rx body={phone: 'Jane'}", "wifi ssid=Home", "wireless name=Jane Smith's iPhone")) {
+            val redacted = DiagnosticRedactor.redact(line)
+            assertNotNull(line, redacted)
+            assertEquals(line, DiagnosticRedactor.WITHHELD, redacted)
+            assertFalse(line, redacted!!.contains("secret"))
+            assertFalse(line, redacted.contains("Jane"))
+        }
+    }
+
+    /** `filename:` and `username:` are not device names, and must not cost the line. */
+    @Test fun aNameThatIsNotADeviceNameSurvives() {
+        for (line in listOf("usb/list filename: cable.txt", "settings username: driver")) {
+            assertEquals(line, line, DiagnosticRedactor.redact(line))
+        }
+    }
+    /**
+     * A line naming the pair record is evidence; a line carrying one is a credential. The filter used
+     * to drop both, so the report lost the single line that says whether the saved Lockdown record was
+     * reused or a new one created — the one fact that tells a stale host apart from a phone that has
+     * forgotten this accessory, which is what a rejected HostID looks like from here.
+     */
+    @Test fun namingThePairRecordSurvivesWhileItsValueDoesNot() {
+        assertEquals(
+            "wired using saved Lockdown pair record",
+            DiagnosticRedactor.redact("wired using saved Lockdown pair record"),
+        )
+        assertEquals(
+            "wired created a new Lockdown pair record",
+            DiagnosticRedactor.redact("wired created a new Lockdown pair record"),
+        )
+        // The value still never leaves; the contract changed from "dropped" to "flagged", so these
+        // are the placeholder now, and the placeholder must not carry the value it replaced.
+        for (line in listOf("pair record=deadbeef", "pair_record: deadbeef")) {
+            assertEquals(line, DiagnosticRedactor.WITHHELD, DiagnosticRedactor.redact(line))
+            assertFalse(line, DiagnosticRedactor.redact(line)!!.contains("deadbeef"))
+        }
+    }
+    @Test fun stateTransitionsSurviveWithoutAddressesOrIdentifiers() {        val line = DiagnosticRedactor.redact("connected peer=C0:A6:00:29:58:0A ip=192.168.31.71 id=0123456789abcdef0123456789abcdef ipv6=fe80::1234:5678:abcd:9%p2p0")!!
         assertTrue(line.contains("connected"))
         assertFalse(line.contains("C0:A6")); assertFalse(line.contains("192.168")); assertFalse(line.contains("012345")); assertFalse(line.contains("fe80"))
     }
@@ -103,5 +148,21 @@ class DiagnosticRedactorTest {
             assertTrue("the previous writer rotated the new session's log away", report.contains("session=new"))
             assertTrue(report.contains("drained line from the previous session"))
         } finally { folder.deleteRecursively() }
+    }
+
+    /**
+     * The accessory's SDP answer is only as good as knowing what was asked: a phone that wanted an attribute
+     * the published record does not carry and a phone that never got an answer at all look identical from this
+     * side, so the request's parameters go into the log. They go in with the octets separated, because an
+     * unbroken run of 24 or more hex digits reads to this filter as an opaque identifier and is replaced —
+     * which would leave the line saying nothing about what was asked.
+     */
+    @Test fun aSpacedHexQuestionSurvivesWhileAnUnbrokenBlobWouldNot() {
+        val question = "adapter-bt: sdp asked (pattern max ids cont) 35 03 19 01 00 09 00 04"
+        assertEquals(question, DiagnosticRedactor.redact(question))
+        assertEquals(
+            "sdp asked [identifier]",
+            DiagnosticRedactor.redact("sdp asked 3503190100090004350519000308"),
+        )
     }
 }

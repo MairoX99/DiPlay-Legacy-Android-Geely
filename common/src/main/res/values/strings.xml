@@ -73,7 +73,6 @@
     <string name="safe_area_full_screen_at">Safe area: full screen at\u0020</string>
     <string name="safe_area_prefix">Safe area:\u0020</string>
     <string name="settings_android9_compat">The following settings are unavailable and hidden on Android 9 (API 28):\n• Wi-Fi P2P (5 GHz) — LocalOnlyHotspot is used instead.\n• HEVC software decoder — hardware decoding is used instead.</string>
-    <string name="settings_mfi_address_hint">Address must start with http:// or https://. Token is optional and sent as an Authorization bearer token.</string>
     <string name="app_name" tools:ignore="MissingTranslation">DiPlay</string>
     <string name="language_section_title">Language</string>
     <string name="language_app_language">App language</string>
@@ -94,7 +93,7 @@
     <string name="allow_nearby_devices_so_diplay_can_connect_to_your_paired">Allow Nearby devices so DiPlay can connect to your paired iPhone.</string>
     <string name="allow_precise_location_for_diplay_in_the_head_unit_s_app_p">Allow precise Location for DiPlay in the head unit’s app permissions.</string>
     <string name="allow_the_connection_permission_to_continue">Allow the connection permission to continue</string>
-    <string name="an_independent_carplay_receiver_for_android_head_units_wir">An independent CarPlay receiver for Android head units. Wired and wireless connections run on the head unit, with local authentication. A standard iPhone can connect without a jailbreak, Mac, dongle or sign-in.\n\nThis preview uses an experimental accessory identity. Compatibility with every iPhone and head unit is still being tested. It is not an Apple-certified product.</string>
+    <string name="an_independent_carplay_receiver_for_android_head_units_wir">An independent CarPlay receiver for Android head units. Wired and wireless connections run on the head unit, with local authentication. A standard iPhone can connect without a jailbreak, Mac, adapter or sign-in.\n\nThis preview uses an experimental accessory identity. Compatibility with every iPhone and head unit is still being tested. It is not an Apple-certified product.</string>
     <string name="android_9_compatibility">Android 9 compatibility</string>
     <string name="app_permissions">App permissions</string>
     <string name="app_settings">App settings</string>
@@ -139,7 +138,6 @@
     <string name="check_and_enable">Check and enable</string>
     <string name="check_that_storage_is_available_or_choose_another_save_loc">Check that storage is available, or choose another save location.</string>
     <string name="choose_how_to_connect_follow_the_setup_steps_and_save_your">Choose how to connect, follow the setup steps and save your car hotspot details.</string>
-    <string name="choose_image">Choose image</string>
     <string name="choose_iphone">Choose iPhone</string>
     <string name="choose_location">Choose location</string>
     <string name="choose_save_location">Choose save location</string>
@@ -170,12 +168,11 @@
     <string name="could_not_reset_wi_fi_direct_close_the_other_projection_ap">Could not reset Wi-Fi Direct. Close the other projection app and try again.</string>
     <string name="could_not_save_image">Could not save image</string>
     <string name="could_not_save_the_report">Could not save the report</string>
+    <string name="could_not_upload_the_report">Could not upload the report</string>
     <string name="could_not_start_carplay_return_to_diplay_and_check_app_per">Could not start CarPlay. Return to DiPlay and check app permissions.</string>
-    <string name="custom_1_1_icon">Custom 1:1 icon</string>
     <string name="debug_logs">Debug logs</string>
-    <string name="default_icon">Default icon</string>
-    <string name="default_placeholder_icon">Default placeholder icon</string>
     <string name="diagnostic_report_saved">Diagnostic report saved</string>
+    <string name="generate_and_upload_report">Generate and upload</string>
     <string name="diagnostics">Diagnostics</string>
     <string name="diplay" tools:ignore="MissingTranslation">DiPlay</string>
     <string name="discard_changes_and_exit_settings">Discard changes and exit settings</string>
@@ -187,7 +184,11 @@
     <string name="drag_to_move_pinch_to_zoom">Drag to move, pinch to zoom</string>
     <string name="draw_outside_safe_area">Draw outside safe area</string>
     <string name="driving_side">Driving side</string>
-    <string name="efficient_video">Efficient video</string>
+    <string name="video_codec">Video codec</string>
+    <string name="video_codec_h264">H.264 · default, widest head-unit compatibility</string>
+    <string name="video_codec_h265">H.265 (HEVC) · smaller stream, some head units cannot decode it</string>
+    <string name="direct_video_surface">Direct video surface</string>
+    <string name="direct_video_surface_description">Draws the picture straight onto the screen and skips one texture composition. On by default on Android 6 and older. Applies when you return to the connection screen. Turn it off if the picture stays black.</string>
     <string name="enable_the_car_s_bluetooth_and_pair_your_iphone_first">Enable the car’s Bluetooth and pair your iPhone first.</string>
     <string name="error">Error</string>
     <string name="restart_application">RESTART APPLICATION</string>
@@ -218,10 +219,8 @@
     <string name="hotspot_ssid_must_be_at_most_32_utf_8_bytes">Hotspot SSID must be at most 32 UTF-8 bytes</string>
     <string name="hotspot_status">Hotspot status</string>
     <string name="i2c" tools:ignore="MissingTranslation">I2C</string>
-    <string name="i2c_device">I2C device</string>
     <string name="i2c_device_path_contains_u_0000">I2C device path contains U+0000</string>
     <string name="i2c_device_path_is_required">I2C device path is required</string>
-    <string name="identity_appearance">Identity &amp; appearance</string>
     <string name="image_is_not_ready">Image is not ready</string>
     <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">In CarPlay, swipe down with three fingers to open DiPlay settings.</string>
     <string name="instrument_contrast">Instrument contrast</string>
@@ -230,7 +229,6 @@
     <string name="keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow">Keep your iPhone nearby with Bluetooth and Wi-Fi on.\nAllow CarPlay if your iPhone asks.</string>
     <string name="later">Later</string>
     <string name="left_hand_drive">Left-hand drive</string>
-    <string name="linux_device_path_for_example_dev_i2c_1">Linux device path, for example /dev/i2c-1.</string>
     <string name="loading_image">Loading image</string>
     <string name="local_offline">Local offline</string>
     <string name="localonlyhotspot" tools:ignore="MissingTranslation">LocalOnlyHotspot</string>
@@ -241,10 +239,7 @@
     <string name="make_diplay_feel_right_for_your_car">Make DiPlay feel right for your car.</string>
     <string name="manual_hotspot">Manual hotspot</string>
     <string name="manual_mode_match_the_cluster_theme_here_the_map_cannot_fo">Manual mode: match the cluster theme here. The map cannot follow card visibility without Usage Access.</string>
-    <string name="manufacturer">Manufacturer</string>
     <string name="mfi_authentication_ready">MFi authentication ready</string>
-    <string name="mfi_certificate_signing_target">MFI certificate &amp; signing target</string>
-    <string name="model">Model</string>
     <string name="music_buffer">Music buffer</string>
     <string name="resolution_native">Native</string>
     <string name="navigation_on_hud_and_instrument_cluster">Navigation on HUD and dashboard</string>
@@ -252,7 +247,6 @@
     <string name="nearby_devices">Nearby devices</string>
     <string name="nearby_devices_connects_your_iphone_microphone_enables_sir">Nearby devices connects your iPhone. Microphone enables Siri and calls. Older Android versions also require Location for wireless setup. USB mode may ask for a local VPN connection.</string>
     <string name="nothing_is_sent_automatically_protocol_payloads_and_creden">Nothing is sent automatically. Protocol payloads and credentials are excluded.</string>
-    <string name="oem_label">OEM label</string>
     <string name="on_your_iphone_open_settings_bluetooth_and_pair_with_the_c">On your iPhone, open Settings → Bluetooth and pair with the car. Then return to DiPlay and choose Connect phone.</string>
     <string name="one_time_setup_on_this_car">One-time setup on this car</string>
     <string name="open">Open</string>
@@ -332,11 +326,13 @@
     <string name="save_the_name_and_password_from_the_car_s_hotspot_settings">Save the name and password from the car’s hotspot settings first</string>
     <string name="save_your_hotspot_details_in_connection_setup_first">Save your hotspot details in Connection setup first</string>
     <string name="saved_for_your_next_connection">Saved for your next connection</string>
+    <string name="report_uploaded">Report uploaded</string>
+    <string name="report_uploaded_detail">Saved in logs/%1$s, %2$d bytes.</string>
     <string name="saving_report">Saving report…</string>
+    <string name="uploading_report">Uploading…</string>
     <string name="security">Security</string>
     <string name="selecting_carplay_configuration">Selecting CarPlay configuration</string>
     <string name="sends_precise_android_location_as_carplay_gps_data_when_th">Sends precise Android location as CarPlay GPS data when the iPhone requests it.</string>
-    <string name="server_address">Server address</string>
     <string name="set">Set</string>
     <string name="set_up_once_your_details_stay_saved_for_the_next_drive_cha">Set up once. Your details stay saved for the next drive. Changes apply to your next connection.</string>
     <string name="settings">Settings</string>
@@ -361,7 +357,6 @@
     <string name="this_head_unit_does_not_support_wi_fi_direct">This head unit does not support Wi-Fi Direct.</string>
     <string name="this_head_unit_has_no_available_file_picker_to_save_the_re">This head unit has no available file picker to save the report.</string>
     <string name="this_head_unit_may_not_support_wireless_carplay_try_a_usb">This head unit may not support wireless CarPlay. Try a USB connection.</string>
-    <string name="token_optional">Token (optional)</string>
     <string name="transport_error_reconnecting">Transport error; reconnecting</string>
     <string name="turn_on_bluetooth">Turn on Bluetooth</string>
     <string name="turn_on_wi_fi_in_the_head_unit_s_settings_to_connect">Turn on Wi-Fi in the head unit’s settings to connect.</string>
@@ -372,7 +367,6 @@
     <string name="usb_ch341">USB/CH341</string>
     <string name="use_a_usb_data_cable_and_the_car_s_usb_data_port_unlock_yo">Use a USB data cable and the car’s USB data port. Unlock your iPhone and allow CarPlay. No hotspot setup is needed.</string>
     <string name="use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an">Use a USB data cable and unlock your iPhone.\nAllow Trust and CarPlay if your iPhone asks.</string>
-    <string name="use_hevc_leave_off_for_the_widest_head_unit_compatibility">Use HEVC. Leave off for the widest head-unit compatibility.</string>
     <string name="use_software_hevc_decoder">Use software HEVC decoder</string>
     <string name="use_usage_content_type_routing_instead_of_stream_type">Use usage / content-type routing instead of stream type</string>
     <string name="use_your_last_connection_type_and_selected_iphone">Use your last connection type and selected iPhone.</string>
@@ -461,4 +455,40 @@
     <string name="diagnostic_report_saved_to_path">Your report was saved to:\n%1$s\n\nYou can also share it or view it here. Nothing is sent automatically.</string>
     <string name="view_diagnostic_report">View report</string>
     <string name="diagnostic_report_copy_hint">Touch and hold the report text to select and copy it. You can use this if no sharing app is available.</string>
+    <string name="adapter_pair_hint">On your iPhone open Settings → Bluetooth → Other Devices, then tap the name above. Do not tap the car\'s existing Bluetooth entry.</string>
+    <string name="connection_tab_wired">Wired</string>
+    <string name="connection_tab_wireless">Wireless</string>
+    <string name="connection_step_usb">USB device</string>
+    <string name="connection_step_mfi">MFi</string>
+    <string name="connection_step_link">Data link</string>
+    <string name="connection_step_session">CarPlay</string>
+    <string name="connection_step_hotspot">Hotspot</string>
+    <string name="connection_step_pairing">Pairing</string>
+    <string name="connection_step_wireless_network">Network attach</string>
+    <string name="connection_step_wireless_link">Data channel</string>
+    <string name="connection_step_wireless_session">Session</string>
+    <string name="connection_headline_connecting">Connecting…</string>
+    <string name="connection_headline_connected">Connected</string>
+    <string name="connection_headline_failed">Connection failed</string>
+    <string name="connection_entry_wireless_unavailable">This head unit has no usable wireless route. Use the USB cable.</string>
+    <string name="connection_entry_wired_unavailable">No USB data port was detected. Use the wireless route.</string>
+    <string name="connection_entry_manual_hotspot">Enter hotspot details</string>
+    <string name="failure_mfi_usb_permission_denied">The MFi adapter was not allowed. Unplug it, plug it back in, and reconnect.</string>
+    <string name="failure_mfi_usb_permission_timeout">The MFi adapter got no USB permission. Unplug it, plug it back in, and reconnect.</string>
+    <string name="failure_iphone_usb_permission_denied">The iPhone was not allowed. Unlock it and allow CarPlay when it asks.</string>
+    <string name="failure_iphone_usb_permission_timeout">The iPhone got no USB permission. Unlock it and reconnect.</string>
+    <string name="failure_control_channel_closed">The CarPlay control channel closed. Reconnect to try again.</string>
+    <string name="failure_wireless_control_channel_closed">The wireless data channel closed. Reconnect to try again.</string>
+    <string name="failure_transport_attach_failed">The network link could not be attached.</string>
+    <string name="failure_host_id_rejected">The iPhone refused this accessory\'s identity. On the iPhone, remove this car under Settings, General, CarPlay — or forget the accessory in Bluetooth — then plug the cable in again.</string>
+    <string name="failure_bring_up_failed">CarPlay could not start.</string>
+    <string name="switch_on">On</string>
+    <string name="switch_off">Off</string>
+    <string name="connection_action_plug_in">Plug in a USB data cable, then unlock your iPhone</string>
+    <string name="connection_action_wrong_device">Another device is attached · connect your iPhone</string>
+    <string name="connection_action_reseat">The link keeps dropping · reseat the plug</string>
+    <string name="connection_action_power">The phone reset under load · try a shorter cable or a powered port</string>
+    <string name="connection_diagnostics_show">Show</string>
+    <string name="connection_diagnostics_hide">Hide</string>
+    <string name="connection_settings_incomplete">The connection settings are incomplete · open Settings and fill in the car hotspot</string>
 </resources>

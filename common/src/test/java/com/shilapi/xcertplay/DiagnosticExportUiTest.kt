@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay
 
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Looper
 import android.view.View
@@ -62,6 +63,45 @@ class DiagnosticExportUiTest {
         } finally {
             controller.pause().stop().destroy()
         }
+    }
+
+    /**
+     * The header is what places a report: which build, which car, which settings. It is also the only
+     * place the reason authentication failed can appear — "authentication unavailable" on its own cannot
+     * tell a missing asset from a rejected certificate, and the exception itself went to logcat, which a
+     * head unit with no adb cannot show anyone.
+     */
+    @Test fun theHeaderNamesTheReasonAuthenticationFailed() {
+        val activity = Robolectric.buildActivity(DiPlayActivity::class.java).setup().get()
+        ReflectionHelpers.setField(activity, "setupErrorDetail", "IdentityMissing: no offline-mfi assets")
+        val header = ReflectionHelpers.callInstanceMethod<String>(
+            activity, "buildDiagnosticHeader",
+            ReflectionHelpers.ClassParameter.from(Context::class.java, activity.applicationContext),
+        )
+        assertTrue("the reason must be in the header, not only the symptom", header.contains("IdentityMissing"))
+        assertTrue(header.contains("CarPlay setup: authentication unavailable — IdentityMissing: no offline-mfi assets"))
+    }
+
+    @Test fun aSetupThatDidNotFailIsReportedAsReady() {
+        val activity = Robolectric.buildActivity(DiPlayActivity::class.java).setup().get()
+        ReflectionHelpers.setField(activity, "setupErrorDetail", null)
+        val header = ReflectionHelpers.callInstanceMethod<String>(
+            activity, "buildDiagnosticHeader",
+            ReflectionHelpers.ClassParameter.from(Context::class.java, activity.applicationContext),
+        )
+        assertTrue(header.contains("CarPlay setup: ready"))
+        assertFalse(header.contains("authentication unavailable"))
+    }
+
+    /**
+     * The failure this exercises is real: the offline-mfi assets are deliberately not in the tree, so the
+     * bootstrap fails here exactly as it does on a build without them.
+     */
+    @Test fun aFailedBootstrapKeepsTheExceptionForTheHeader() {
+        val activity = Robolectric.buildActivity(DiPlayActivity::class.java).setup().get()
+        val detail = ReflectionHelpers.getField<String>(activity, "setupErrorDetail")
+        assertNotNull("setupError alone cannot say which failure it was", detail)
+        assertTrue("the detail must name a class and a message", detail!!.contains(":"))
     }
 
     private fun descendants(view: View): Sequence<View> = sequence {

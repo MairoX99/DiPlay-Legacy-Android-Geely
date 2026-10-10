@@ -15,8 +15,8 @@ import android.os.Build
 import android.os.HandlerThread
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
 import androidx.annotation.RequiresApi
+import com.shilapi.xcertplay.DiagLog
 import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
 import java.io.IOException
 import java.net.Inet4Address
@@ -644,7 +644,7 @@ class WifiP2pGroupManager(
                 })
             }
         } catch (failure: RuntimeException) {
-            Log.w(TAG, "Wi-Fi P2P removeGroup could not be issued", failure)
+            DiagLog.w(TAG, "Wi-Fi P2P removeGroup could not be issued", failure)
             latch.countDown()
         }
         if (!waitForCallback) return

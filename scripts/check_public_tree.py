@@ -20,3 +20,4 @@ for name in filter(None, names):
 if failures:
     raise SystemExit('Credential or distribution files are forbidden in the public tree:\n' + '\n'.join(failures))
 print('Public tree check passed: no credential containers or private-key blocks.')
+

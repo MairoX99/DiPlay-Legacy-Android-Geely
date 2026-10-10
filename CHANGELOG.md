@@ -11,6 +11,141 @@ alignment line, not the base line, is what says how current a release is.
 
 ---
 
+## 4.0-geely-rc — 2026-10-10
+
+**Upstream alignment:** not re-checked for this release. The anchor is unchanged from 0.3.5.
+
+### Connection page
+
+- **The page is laid out for the head unit's 24:9 screen.** Status, a four-step progress row and the
+  one action are on the left; the USB bus and the handshake log are on the right; the transport
+  choice, Settings and the way home are in a bar at the top. Nothing scrolls, so the buttons are
+  reachable without scrolling — on a 1920×720 panel the old centred column was taller than the
+  screen. The status line wraps to two lines: a failed attempt arrives as a whole sentence, and a
+  title that cut it off mid-clause told the driver nothing.
+- **The progress row names the step the attempt is actually on.** The rung was worked out inside the
+  host activity, which knew the wired statuses and reported every other one as the last rung — so an
+  attempt still opening its data paths could read as finished. `ConnectionPlan` owns the mapping now,
+  once, for both transports, and it is exhaustive over the controller's statuses: a status the
+  controller gains has to be placed on both ladders, or `:shared` stops compiling.
+- **Choosing the iPhone, and what a refused attempt was missing, both happen on the page.** Each was
+  an `AlertDialog` that had to be dismissed before the next step was readable. The phone is a
+  selected/primary pair of buttons, and a refused connect shows its reasons in a card on the page
+  rather than over it.
+- **Plugging a USB device in no longer starts anything.** `CarPlayHostActivity` claimed
+  `USB_DEVICE_ATTACHED` with a device filter, so Android opened the projection screen the moment a
+  device matched and the session started on its own — an iPhone cable went straight to wired
+  CarPlay. The filter is gone; a connection begins only from the connect button. The wired path is
+  unchanged once it is asked for.
+- **A wired fault now says what to do about it.** The link assessment already worked out whether
+  nothing was on the bus, whether the attached device was not an iPhone, whether the plug was loose,
+  or whether the supply dipped; that verdict is shown as the primary button's advice instead of every
+  fault ending at "Reconnect".
+- **The car's own hotspot is read from the head unit instead of asked for.** The only wireless mode
+  left on this fork's API floor is the car's own hotspot, and it needs a name and key before a
+  connection can start — a freshly installed DiPlay has neither, so it used to reach the attempt
+  blank and fail there. The head unit already holds both, so they are taken from it when the driver
+  has not entered their own; entered values still win. The home screen and connection setup read the
+  same pair, so the hotspot they name is the one the connection will use, and setup no longer stops
+  the driver to retype details the car had already supplied. An incomplete runtime config now says so
+  on the page rather than taking the screen down.
+- **A car hotspot taken from the head unit is announced with the security its key implies.** The
+  security mode was derived from the stored passphrase, which on a fresh install is empty — so the
+  car's WPA2 key was announced as an open network. Both the settings page and the hotspot manager
+  hold that mode against the live access point, and both refused it: the first would not save a key
+  it had been told was open, the second rejected the access point outright. The mode now follows the
+  passphrase the connection actually uses, so a secure car hotspot stays secure and an open one stays
+  open. The handshake line names the mode it adopted, since it is the one part of the pair the car
+  does not supply.
+
+### Wired link
+
+- **A pulled cable is reported as a pulled cable.** `ACTION_USB_DEVICE_DETACHED` was handled, but not
+  for the iPhone, so a wired session learned the phone was gone when a USBMUX read eventually failed,
+  and the page reported it in USB-layer terms long after it had left. The controller listens now.
+  Mid-session it fails at once and names the cable, and the existing reconnect path does the rest;
+  while searching it restarts the search, so a permission poll already running cannot wait out its
+  whole timeout for a phone that is no longer there.
+- **"Waiting for iPhone" says what is wrong with the cable.** The page had one sentence for "no
+  iPhone". It now separates an empty bus — port, charge-only cable, or the plug's orientation — from
+  a bus holding something that is not a phone. The verdict goes to the handshake log after six
+  seconds of empty searching, and only when it changes.
+- **A CarPlay re-enumeration is not a re-plug.** The configuration request asks the iPhone to leave
+  the bus and come back, so the phone detaches on every connection that works. Counting those as a
+  drop would have called a working cable loose after three good connections. Only a detach in a phase
+  where nothing asked the phone to leave is counted, and only a return inside five seconds counts — a
+  slower one is a person walking to the phone. The count is kept for the life of the process rather
+  than on the controller, because a session that drops mid-stream is handled by rebuilding the
+  controller, which would have destroyed the counter that was counting the drop.
+- **Waiting for the CarPlay configuration has a way out.** That rung is ended by the attach that
+  brings the re-enumerated phone back, and a cable pulled while waiting for it left the rung waiting
+  forever for an attach that was never coming. It carries a ten-second deadline now, and expiry fails
+  the attempt instead of searching again — the phone is off the bus for the whole of a healthy
+  re-enumeration, so a shorter watch would read a slow one as a pulled cable, and restarting from
+  there would reset the count that bounds how often the phone may be asked to leave the bus.
+- **An iPhone 17 Pro Max draws more than the head unit's USB port supplies, and that is what its
+  dropouts are.** Confirmed on the car: the session ends and reconnects because the phone cannot get
+  the current it asks for. Neither the cable nor the app is the cause, nothing in this release
+  changes it in either direction, and a powered hub is the way around it.
+
+### Wireless
+
+- **A held port 7000 no longer ends the attempt.** 7000 is what AirPlay conventionally uses, and on a
+  head unit something else can be holding it — a DiPlay process that did not exit, or another app —
+  so a failed bind used to fail the whole wireless attempt. `AirPlayPorts` takes the requested port
+  when it is free and an ephemeral one otherwise. The iPhone is told the port in the Bonjour record
+  and in the iAP2 Wi-Fi configuration, so any free port still reaches us.
+- **A responder that will not come up names the socket.** `CarPlayBonjour` reports the port, the
+  address and the family when an interface's responder cannot start, in place of a bare
+  `BindException` that said none of them.
+
+### Diagnostics
+
+- **Every transport, media and network line reaches the session log.** `android.util.Log` became
+  `DiagLog` across 102 call sites in 17 files: the logcat entry stays, and the same text is offered
+  to `DiagSink`. Those lines went to logcat and nowhere else, and on a head unit with no adb they are
+  the only description of why a link failed.
+- **Lines written before a log exists are held rather than dropped.** `DiagSink` queues up to
+  `PENDING_CAPACITY` (256) lines and flushes them the moment a writer attaches. The transport and
+  media threads report before the host page opens its log and outlive it, so the first seconds of a
+  run — the ones that say why it failed — were the ones being thrown away.
+- **A crash is written into the session log.** `DiagCrashHandler` is installed by both pages in
+  `onCreate`, and it wrote through a path only `SessionLogFile.reset()` creates — which needs a
+  successful bootstrap. A crash before the first session, the clean-install case and the one most
+  worth having, was written nowhere at all.
+- **The report says what it lost.** `DiagnosticCounters` counts queue drops, write failures and sink
+  overflows. A full disk, a full queue and a closed writer all produced the same result as a quiet
+  run, which is what made a missing line unreadable.
+- **The byte budget is spent on signal lines, not on repeats.** `DiagnosticDigest` keeps signal lines
+  from every run first, then the newest run in full, then older runs; consecutive repeats cost one
+  line and a count, and whatever does not fit is stated rather than dropped quietly. The field
+  reports were four near-identical runs of "found none": the budget went on saying it four times and
+  the line that explained the failure was never in the file. The budget is `BUDGET_BYTES` (1 MiB),
+  the upload cap, so what is saved is what would be sent.
+- **The header survives the budget, and the report reads in order.** The header — which build, which
+  car — is kept out of what the budget can spend, and `setupErrorDetail` carries the exception behind
+  an auth failure into it, where until then it existed only in logcat. `compose()` numbered lines
+  with a per-section index, so the final sort grouped every run's first line together and read the
+  timestamps backwards; one running index across the sections is chronological order.
+- **A withheld line is flagged rather than removed.** `DiagnosticRedactor` marks a line it withheld
+  instead of dropping it whole, so a report cannot read as a run in which the line never happened.
+- **The report can be got off the car.** It was written only to the app's own external directory,
+  which the head unit's file picker does not reach and a stick cannot see — so the run that needed
+  handing over was the one that could not be. It is copied to `Downloads/DiPlay`, to every external
+  volume the context reports, and to the USB mount roots this head unit uses, with the app's private
+  directory as the fallback. `WRITE_EXTERNAL_STORAGE` is declared with `maxSdkVersion 28` so the
+  Android 4.4–8.1 units can write those copies at all.
+- **The log-upload key cannot reach a published APK.** It was kept out only by `local.properties`
+  being absent, and a workspace can hold one for reasons unrelated to the build.
+  `scripts/package-geely.sh` clears the fields whenever CI is set and leaves a local compile alone,
+  and the release workflow fails rather than publish an APK that still carries a key.
+
+### Languages
+
+- **The picker offers the two languages this port actually translates.** Arabic, Russian and Spanish
+  came from upstream and had already fallen behind — the strings added since 0.3.5 were English on
+  those screens anyway. Their string files and their picker entries are gone.
+
 ## 0.3.5-geely-rc — 2026-10-08
 
 **Upstream alignment:** not re-checked for this release. The anchor is unchanged from 0.3.4:

@@ -29,17 +29,65 @@ internal object DiagnosticExportStore {
                 // Preserve the report even when the OEM's public storage provider is absent.
             }
         }
-        try {
+        val saved = try {
             // Use Android's package-specific directory, including debug application IDs.
             // No storage permission or document-picker activity is needed.
             val externalFiles = context.getExternalFilesDir(null)
             if (externalFiles != null) {
-                return saveInDirectory(context, File(externalFiles, "diagnostic-reports"), fileName, report)
+                saveInDirectory(context, File(externalFiles, "diagnostic-reports"), fileName, report)
+            } else {
+                saveInDirectory(context, File(context.filesDir, "diagnostic-reports"), fileName, report, savedInApp = true)
             }
         } catch (_: Exception) {
             // A missing, read-only or full external volume must not prevent export.
+            saveInDirectory(context, File(context.filesDir, "diagnostic-reports"), fileName, report, savedInApp = true)
         }
-        return saveInDirectory(context, File(context.filesDir, "diagnostic-reports"), fileName, report, savedInApp = true)
+        exportCopiesToAccessibleStorage(context, fileName, report)
+        return saved
+    }
+
+    /** Best-effort copies so a driver with no picker can pull the report off a stick or card. */
+    private fun exportCopiesToAccessibleStorage(context: Context, fileName: String, report: String) {
+        runCatching {
+            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            writeReportTo(File(downloads, "DiPlay"), fileName, report)
+        }
+        runCatching {
+            writeReportTo(File(Environment.getExternalStorageDirectory(), "DiPlay"), fileName, report)
+        }
+        runCatching {
+            val volumes = context.getExternalFilesDirs(null) ?: return@runCatching
+            for (index in 1 until volumes.size) {
+                val volume = volumes[index] ?: continue
+                writeReportTo(File(volume, "diagnostic-reports"), fileName, report)
+            }
+        }
+        runCatching {
+            usbVolumeDirectories().forEach { writeReportTo(File(it, "DiPlay"), fileName, report) }
+        }
+    }
+
+    // A stick is mounted as a child of these roots, not at the root itself: E01 puts it at
+    // /storage/usbotg/usbotg-sda1, with the raw twin under /mnt/media_rw.
+    private val usbMountRoots = listOf(
+        "/storage/usbotg",
+        "/storage/udisk",
+        "/mnt/usb_storage",
+        "/mnt/udisk",
+        "/mnt/usb",
+        "/mnt/media_rw",
+    )
+
+    private fun usbVolumeDirectories(): List<File> = usbMountRoots.flatMap { path ->
+        val root = File(path)
+        if (!root.isDirectory) emptyList()
+        else listOf(root) + root.listFiles().orEmpty().filter { it.isDirectory }
+    }
+
+    private fun writeReportTo(directory: File, fileName: String, report: String) {
+        if (!directory.isDirectory && !directory.mkdirs()) return
+        if (!directory.canWrite()) return
+        File(directory, fileName).writeText(report, Charsets.UTF_8)
     }
 
     private fun saveInDirectory(

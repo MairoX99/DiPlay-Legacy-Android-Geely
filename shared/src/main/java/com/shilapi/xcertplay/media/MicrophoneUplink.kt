@@ -4,7 +4,7 @@ import android.media.AudioFormat as AndroidAudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import com.shilapi.xcertplay.airplay.AudioCodecKind
 import com.shilapi.xcertplay.airplay.MicrophoneConfig
 import com.shilapi.xcertplay.airplay.MicrophoneCounters
@@ -46,7 +46,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
             AndroidAudioFormat.ENCODING_PCM_16BIT,
         )
         if (minBuffer <= 0) {
-            Log.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
+            DiagLog.w(TAG, "microphone unavailable rate=${config.sampleRate} channels=${config.channels}")
             running.set(false)
             return false
         }
@@ -62,7 +62,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
             null
         }
         if (config.codec == AudioCodecKind.OPUS && nextEncoder == null) {
-            Log.w(TAG, "microphone Opus encoder is unavailable")
+            DiagLog.w(TAG, "microphone Opus encoder is unavailable")
             running.set(false)
             return false
         }
@@ -91,13 +91,13 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
                 )
             }
         } catch (error: Exception) {
-            Log.e(TAG, "microphone recorder creation failed", error)
+            DiagLog.e(TAG, "microphone recorder creation failed", error)
             nextEncoder?.close()
             running.set(false)
             return false
         }
         if (nextRecorder.state != AudioRecord.STATE_INITIALIZED) {
-            Log.w(TAG, "microphone recorder failed to initialize")
+            DiagLog.w(TAG, "microphone recorder failed to initialize")
             nextRecorder.release()
             nextEncoder?.close()
             running.set(false)
@@ -110,7 +110,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
                 bind(InetSocketAddress(InetAddress.getByName("::"), 0))
             }
         } catch (error: Exception) {
-            Log.e(TAG, "microphone socket creation failed", error)
+            DiagLog.e(TAG, "microphone socket creation failed", error)
             nextRecorder.release()
             nextEncoder?.close()
             running.set(false)
@@ -126,7 +126,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
                 isDaemon = true
                 start()
             }
-            Log.i(
+            DiagLog.i(
                 TAG,
                 "microphone uplink started type=${config.audioType} " +
                     "rate=${config.sampleRate} channels=${config.channels} " +
@@ -134,7 +134,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
             )
             true
         } catch (error: Exception) {
-            Log.e(TAG, "microphone recording failed", error)
+            DiagLog.e(TAG, "microphone recording failed", error)
             release()
             false
         }
@@ -153,7 +153,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
                     recorder.read(readBuffer, 0, readBuffer.size)
                 }
                 if (count < 0) {
-                    if (running.get()) Log.e(TAG, "microphone read failed code=$count")
+                    if (running.get()) DiagLog.e(TAG, "microphone read failed code=$count")
                     return
                 }
                 if (count == 0) {
@@ -172,7 +172,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
                 }
             }
         } catch (error: Exception) {
-            if (running.get()) Log.e(TAG, "microphone capture failed", error)
+            if (running.get()) DiagLog.e(TAG, "microphone capture failed", error)
         } finally {
             running.set(false)
             release()
@@ -211,7 +211,7 @@ internal class MicrophoneUplink(private val config: MicrophoneConfig) : Closeabl
         try {
             socket.send(DatagramPacket(packet, packet.size, config.host, config.port))
             if (firstPacketLogged.compareAndSet(false, true)) {
-                Log.i(
+                DiagLog.i(
                     TAG,
                     "microphone first packet bytes=${packet.size} body=${body.size} " +
                         "head=${packet.copyOf(minOf(packet.size, 16)).toHexString()} " +

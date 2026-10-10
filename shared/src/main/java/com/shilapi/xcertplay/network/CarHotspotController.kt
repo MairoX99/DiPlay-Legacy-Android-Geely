@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.os.SystemClock
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import java.lang.reflect.Method
 
 /**
@@ -99,7 +99,7 @@ internal class CarHotspotController(context: Context) {
     /** A SecurityException, direct or inside the InvocationTargetException, is the firmware gating us. */
     private fun deniedOrFailed(error: Exception): Boolean? {
         val denied = error is SecurityException || error.cause is SecurityException
-        Log.w(
+        DiagLog.w(
             TAG,
             if (denied) "the firmware refused the hotspot permission"
             else "the hotspot API rejected the call",

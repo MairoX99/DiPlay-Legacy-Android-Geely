@@ -3,7 +3,7 @@ package com.shilapi.xcertplay.media
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import java.io.Closeable
 
 /**
@@ -28,10 +28,10 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
                 MediaCodec.CONFIGURE_FLAG_ENCODE,
             )
             it.start()
-            Log.i(TAG, "Opus microphone encoder started bitrate=$bitrate")
+            DiagLog.i(TAG, "Opus microphone encoder started bitrate=$bitrate")
         }
     } catch (error: Exception) {
-        Log.w(TAG, "Opus microphone encoder unavailable", error)
+        DiagLog.w(TAG, "Opus microphone encoder unavailable", error)
         null
     }
     private val bufferInfo = MediaCodec.BufferInfo()
@@ -50,7 +50,7 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
         val inputIndex = try {
             codec.dequeueInputBuffer(INPUT_TIMEOUT_US)
         } catch (error: Exception) {
-            Log.w(TAG, "Opus microphone input dequeue failed", error)
+            DiagLog.w(TAG, "Opus microphone input dequeue failed", error)
             return emptyList()
         }
         if (inputIndex >= 0) {
@@ -85,7 +85,7 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
             val index = try {
                 codec.dequeueOutputBuffer(bufferInfo, 0)
             } catch (error: Exception) {
-                Log.w(TAG, "Opus microphone output dequeue failed", error)
+                DiagLog.w(TAG, "Opus microphone output dequeue failed", error)
                 return output
             }
             when {
@@ -110,7 +110,7 @@ internal class OpusEncoder(bitrate: Int) : Closeable {
                         output.add(bytes)
                         outputPackets++
                         if (outputPackets <= FIRST_PACKET_LOG_COUNT) {
-                            Log.i(
+                            DiagLog.i(
                                 TAG,
                                 "Opus microphone packet=$outputPackets bytes=${bytes.size} " +
                                     "head=${bytes.copyOf(minOf(bytes.size, 16)).toHexString()}",

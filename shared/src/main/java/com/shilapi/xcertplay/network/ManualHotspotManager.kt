@@ -8,7 +8,7 @@ import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Looper
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import com.shilapi.xcertplay.orchestration.ManualHotspotBand
 import com.shilapi.xcertplay.orchestration.ManualHotspotSecurity
 import com.shilapi.xcertplay.transport.Iap2WirelessSecurity
@@ -113,7 +113,7 @@ class ManualHotspotManager(
                 }
 
                 if (channel == 0) {
-                    Log.w(
+                    DiagLog.w(
                         TAG,
                         "Could not read the active hotspot channel from Android public APIs; " +
                             "reporting iAP2 channel 0 (auto) instead of configured channel " +

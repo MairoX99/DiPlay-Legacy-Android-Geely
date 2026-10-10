@@ -7,6 +7,7 @@ import android.content.pm.ProviderInfo
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import android.os.Environment
 import androidx.core.content.FileProvider
 import org.junit.Assert.*
 import org.junit.Before
@@ -57,6 +58,19 @@ class DiagnosticExportFallbackTest {
         assertFalse(saved.savedInApp)
         assertEquals("report", reports.listFiles()!!.single().readText())
         assertEquals("report", read(saved.uri))
+    }
+
+    @Test fun reportAlsoLandsWhereAFileManagerCanReachIt() {
+        val card = File(Environment.getExternalStorageDirectory(), "DiPlay/DiPlay-test.txt")
+        val downloads = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "DiPlay/DiPlay-test.txt",
+        )
+        card.parentFile!!.deleteRecursively()
+        downloads.parentFile!!.deleteRecursively()
+        DiagnosticExportStore.saveWithoutPicker(context, "DiPlay-test.txt", "report")
+        assertEquals("report", card.readText())
+        assertEquals("report", downloads.readText())
     }
 
     @Test fun anEarlierShareUriCannotReadALaterExport() {

@@ -29,6 +29,9 @@ internal class SessionLogFile(val file: File) : Closeable {
             }
             file.appendBytes(payload)
             state.length += payload.size
+        }.onFailure {
+            // A full or read-only volume used to look exactly like a quiet run.
+            DiagnosticCounters.noteLogWriteFailure()
         }
         Unit
     }

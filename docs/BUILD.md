@@ -26,6 +26,8 @@ Output: `mobile/build/outputs/apk/release/mobile-release.apk`. The release APK d
 
 The public release source archive corresponds to the tagged source and excludes runtime identities, signing keys, local configuration and build output.
 
+The release APK carries no Supabase log-upload key. `scripts/package-geely.sh` sets `DIPLAY_CLOUD_LOGS=0` whenever `CI` is set, so a package built from a git checkout cannot upload anything and the settings page shows no upload button; a local compile keeps the key and keeps that button. The release workflow refuses to publish an APK that still contains one. To clear it from a package you build here, run the script with `DIPLAY_CLOUD_LOGS=0`.
+
 ## Standalone car-test APK
 
 Use `:mobile:assembleStandaloneDebug` for a test APK that must connect to an iPhone:

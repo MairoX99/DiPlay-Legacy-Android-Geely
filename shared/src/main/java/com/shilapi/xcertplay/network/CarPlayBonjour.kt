@@ -5,7 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import com.shilapi.xcertplay.airplay.AirPlayConfig
 import com.shilapi.xcertplay.airplay.AirPlayIdentity
 import java.io.BufferedReader
@@ -201,23 +201,23 @@ class CarPlayBonjour(
         override fun onServiceRegistered(serviceInfo: NsdServiceInfo) = Unit
 
         override fun onRegistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-            Log.w(TAG, "AirPlay NSD registration failed code=$errorCode")
+            DiagLog.w(TAG, "AirPlay NSD registration failed code=$errorCode")
         }
 
         override fun onServiceUnregistered(serviceInfo: NsdServiceInfo) = Unit
 
         override fun onUnregistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-            Log.w(TAG, "AirPlay NSD unregistration failed code=$errorCode")
+            DiagLog.w(TAG, "AirPlay NSD unregistration failed code=$errorCode")
         }
     }
 
     private val discoveryListener = object : NsdManager.DiscoveryListener {
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.w(TAG, "CarPlay control discovery failed code=$errorCode")
+            DiagLog.w(TAG, "CarPlay control discovery failed code=$errorCode")
         }
 
         override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.w(TAG, "CarPlay control discovery stop failed code=$errorCode")
+            DiagLog.w(TAG, "CarPlay control discovery stop failed code=$errorCode")
         }
 
         override fun onDiscoveryStarted(serviceType: String) = Unit
@@ -259,7 +259,7 @@ class CarPlayBonjour(
                     val address = requireNotNull(localAdvertisedAddress) {
                         "Interface mDNS requires a local advertised address"
                     }
-                    val dns = JmDNS.create(address, "carplay-${config.deviceId.replace(":", "")}")
+                    val dns = interfaceMdnsOrFail(address)
                     interfaceMdns = dns
                     dns.addServiceListener("$CARPLAY_CONTROL_SERVICE_TYPE.local.", interfaceListener)
                     dns.registerService(ServiceInfo.create(
@@ -300,6 +300,23 @@ class CarPlayBonjour(
                 throw error
             }
         }
+    }
+
+    /**
+     * Brings up the interface mDNS responder, naming the bind when it will not come up.
+     *
+     * A refusal here arrives as a bare `BindException: bind failed: EADDRINUSE`, which says neither which
+     * socket nor which family asked for it — on a head unit whose own `mdnsd` may already hold 5353, that is
+     * the whole difference between "our port is taken" and "something is wrong in here".
+     */
+    private fun interfaceMdnsOrFail(address: InetAddress): JmDNS = try {
+        JmDNS.create(address, "carplay-${config.deviceId.replace(":", "")}")
+    } catch (error: IOException) {
+        val family = if (address is Inet4Address) "IPv4" else "IPv6"
+        throw IOException(
+            "mDNS $MDNS_PORT bind failed on ${address.hostAddress} ($family): ${error.message}",
+            error,
+        )
     }
 
     override fun close() {
@@ -382,7 +399,7 @@ class CarPlayBonjour(
                 } catch (_: InterruptedException) {
                     return
                 } catch (error: Exception) {
-                    if (!closed) Log.w(TAG, "Interface CarPlay service handling failed", error)
+                    if (!closed) DiagLog.w(TAG, "Interface CarPlay service handling failed", error)
                 }
                 continue
             }
@@ -397,7 +414,7 @@ class CarPlayBonjour(
             } catch (_: InterruptedException) {
                 return
             } catch (error: Exception) {
-                if (!closed) Log.w(TAG, "CarPlay control service handling failed", error)
+                if (!closed) DiagLog.w(TAG, "CarPlay control service handling failed", error)
             }
         }
     }
@@ -451,7 +468,7 @@ class CarPlayBonjour(
                     }
                 }
             } catch (error: RuntimeException) {
-                Log.w(TAG, "CarPlay control service resolution failed", error)
+                DiagLog.w(TAG, "CarPlay control service resolution failed", error)
                 false
             }
             if (!submitted) return null
@@ -461,12 +478,12 @@ class CarPlayBonjour(
                 throw error
             }
             if (!completed) {
-                Log.w(TAG, "CarPlay control service resolution timed out")
+                DiagLog.w(TAG, "CarPlay control service resolution timed out")
                 return null
             }
             resolved.get()?.let { return it }
             if (failure.get() != NsdManager.FAILURE_ALREADY_ACTIVE) {
-                Log.w(TAG, "CarPlay control service resolution failed code=${failure.get()}")
+                DiagLog.w(TAG, "CarPlay control service resolution failed code=${failure.get()}")
                 return null
             }
             if (!closed && attempt + 1 < RESOLVE_ATTEMPTS) {
@@ -590,7 +607,7 @@ class CarPlayBonjour(
         try {
             onEvent(event)
         } catch (error: RuntimeException) {
-            Log.w(TAG, "CarPlay Bonjour event callback failed", error)
+            DiagLog.w(TAG, "CarPlay Bonjour event callback failed", error)
         }
     }
 
@@ -611,6 +628,9 @@ class CarPlayBonjour(
         const val WORKER_NAME = "carplay-bonjour"
         const val AIRPLAY_SERVICE_TYPE = "_airplay._tcp"
         const val CARPLAY_CONTROL_SERVICE_TYPE = "_carplay-ctrl._tcp"
+
+        /** Where an interface mDNS responder listens; named so a refusal can say which socket it was. */
+        const val MDNS_PORT = 5353
         const val WORKER_POLL_MILLIS = 500L
         const val RESOLVE_ATTEMPTS = 3
         const val RESOLVE_TIMEOUT_MILLIS = 10_000L

@@ -14,13 +14,22 @@ import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.hardware.usb.UsbRequest
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import java.io.Closeable
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+
+/**
+ * What one read of the USB bus holds, split the ways the wired-link assessment needs it.
+ *
+ * [devices] leaves out the identities on the ignore list — hardware this app owns, which sits on the
+ * bus whatever the iPhone is doing and so is not evidence about an iPhone. A bus holding only that is
+ * a bus with no iPhone on it, not a bus with the wrong device on it.
+ */
+internal data class UsbBusSnapshot(val usable: UsbDevice?, val devices: Int)
 
 /** Short USB identity for handshake logs. Configuration listing needs API 21. */
 internal fun describeAppleUsbDevice(device: UsbDevice): String {
@@ -59,6 +68,16 @@ class IphoneUsbMatcher private constructor(
     fun matches(vendorId: Int, productId: Int): Boolean =
         if (allowAnyAppleProduct) vendorId == APPLE_VENDOR_ID
         else UsbDeviceId(vendorId, productId) in allowedDevices.orEmpty()
+
+    /**
+     * Vendor alone, for judging what is on the bus rather than what can be opened.
+     *
+     * A device leaves with a different product ID from the one it arrived with — that is what
+     * [IphoneUsbHost.requestCarPlayReenumerationAsync] asks it to do — so a product ID is the wrong
+     * thing to match a detach on. This is also what tells "no Apple device" apart from "an Apple
+     * device this app will not use", which look identical from the outside and are not.
+     */
+    fun matchesVendor(vendorId: Int): Boolean = vendorId == APPLE_VENDOR_ID
 
     companion object {
         /** Apple VID used by LIVI commit 0a3dcaa0bf30d5319506d0e47c7b0d46bc942ec3. */
@@ -108,9 +127,6 @@ class IphoneUsbHost(
         data class Failed(val error: IphoneUsbException) : Iap2SessionResult()
     }
 
-    fun discover(): List<UsbDevice> =
-        usbManager.deviceList.values.filter { matcher.matches(it.vendorId, it.productId) }
-
     @Throws(IphoneUsbException::class)
     fun requestPermission(device: UsbDevice): PermissionRequest {
         requireConfiguredDevice(device)
@@ -148,6 +164,43 @@ class IphoneUsbHost(
         registerReceiver(IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED)) {
             parseAttachedDevice(it)?.let(onAttached)
         }
+
+    /**
+     * Returns the detached device when it was an Apple one, whatever product ID it left under.
+     *
+     * A detach is a loss of presence, not an open: there is nothing to match a product ID against,
+     * and the device is going away, so widening the test can only ever report a removal that
+     * happened.
+     */
+    fun parseDetachedDevice(intent: Intent): UsbDevice? {
+        if (intent.action != UsbManager.ACTION_USB_DEVICE_DETACHED) return null
+        val device = intent.usbDevice() ?: return null
+        return device.takeIf { matcher.matchesVendor(it.vendorId) }
+    }
+
+    /** Register once for this host instance and close the returned handle to unregister it. */
+    fun registerDetachReceiver(onDetached: (UsbDevice) -> Unit): Closeable =
+        registerReceiver(IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)) {
+            parseDetachedDevice(it)?.let(onDetached)
+        }
+
+    /**
+     * What is on the bus right now, in one read. [UsbManager.getDeviceList] is a binder call to the
+     * system server and this runs on the same timer as discovery, so it is asked once and everything
+     * the assessment needs comes back from that.
+     *
+     * [ignored] is what the app owns — the MFi bridge it is configured to talk to, if any. That
+     * hardware is on the bus whether or not an iPhone is, so counting it would answer "is something
+     * attached" with the app's own adapter forever.
+     */
+    internal fun busSnapshot(ignored: Collection<UsbDeviceId> = emptyList()): UsbBusSnapshot {
+        val onBus = usbManager.deviceList.values
+        val foreign = onBus.filterNot { UsbDeviceId(it.vendorId, it.productId) in ignored }
+        return UsbBusSnapshot(
+            usable = onBus.firstOrNull { matcher.matches(it.vendorId, it.productId) },
+            devices = foreign.size,
+        )
+    }
 
     /**
      * Sends the LIVI-evidenced vendor request then closes the connection before re-enumeration.
@@ -262,7 +315,7 @@ class IphoneUsbHost(
                     "Re-enumerated iPhone exposes no USBMUX CarPlay configuration",
                 )
             if (!selectUsbConfiguration(connection, configuration)) {
-                Log.w(
+                DiagLog.w(
                     IphoneCarPlayConfiguration.TAG,
                     "setConfiguration ${configuration.id} reported failure; claiming anyway",
                 )
@@ -271,7 +324,7 @@ class IphoneUsbHost(
                 ?: throw IphoneUsbException.Protocol("CarPlay configuration exposes no USBMUX interface")
             val endpoints = IphoneCarPlayConfiguration.usbMuxEndpoints(usbMux)
                 ?: throw IphoneUsbException.Protocol("USBMUX interface exposes no bulk endpoint pair")
-            Log.i(
+            DiagLog.i(
                 IphoneCarPlayConfiguration.TAG,
                 "usbmux iface=${usbMux.id} alt=${IphoneCarPlayConfiguration.alternateSetting(usbMux)} " +
                     "out=0x${endpoints.first.address.toString(16)} in=0x${endpoints.second.address.toString(16)}",

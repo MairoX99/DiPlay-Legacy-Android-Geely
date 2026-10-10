@@ -72,25 +72,64 @@ class DeviceConnectionSupportTest {
         assertEquals(listOf(WirelessHotspotMode.MANUAL), report.wirelessModes)
     }
 
-    @Test fun savedPlanOverridesTheLastTransport() {
-        val prefs = context.getSharedPreferences("diplay", Context.MODE_PRIVATE)
-        val airplay = context.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        airplay.edit().clear().commit()
-        AirPlayPersistence.saveWirelessEnabled(context, true)
-        assertEquals(DefaultConnectionMode.LAST_USED, DiPlayPreferences.defaultConnectionMode(context))
-        assertTrue(DiPlayPreferences.autoConnectWireless(context))
+    @Test fun theAdapterSuppliesTheRfcommHopTheVendorStackCannot() {
+        val report = DeviceConnectionSupport.assess(
+            ready(22).copy(rfcommSocket = false, adapterRfcomm = true),
+        )
+        assertEquals(listOf(UsableConnection.USB, UsableConnection.CAR_HOTSPOT), report.usable)
+        assertEquals(listOf(WirelessHotspotMode.MANUAL), report.wirelessModes)
+        assertTrue(report.carHotspotNotes.isEmpty())
+    }
 
-        DiPlayPreferences.saveDefaultConnectionMode(context, DefaultConnectionMode.USB)
-        assertFalse(DiPlayPreferences.autoConnectWireless(context))
-        assertTrue(AirPlayPersistence.loadWirelessEnabled(context))
+    @Test fun withoutEitherRfcommHopTheHotspotStaysUnavailable() {
+        val report = DeviceConnectionSupport.assess(ready(22).copy(rfcommSocket = false))
+        assertEquals(listOf(UsableConnection.USB), report.usable)
+        assertTrue(report.wirelessModes.isEmpty())
+        assertEquals(listOf(CarHotspotBlocker.NO_RFCOMM), report.carHotspotNotes)
+    }
 
-        DiPlayPreferences.saveDefaultConnectionMode(context, DefaultConnectionMode.WIRELESS)
-        AirPlayPersistence.saveWirelessEnabled(context, false)
-        assertTrue(DiPlayPreferences.autoConnectWireless(context))
+    @Test fun aHeadUnitWithNoBluetoothStackOffersTheHotspotThroughTheAdapter() {
+        val report = DeviceConnectionSupport.assess(
+            ready(22).copy(bluetooth = BluetoothRead.MISSING, adapterRfcomm = true),
+        )
+        assertEquals(listOf(UsableConnection.USB, UsableConnection.CAR_HOTSPOT), report.usable)
+        assertEquals(listOf(WirelessHotspotMode.MANUAL), report.wirelessModes)
+        // No warning about the head unit's own stack: with the adapter supplying the hop, that is no longer a
+        // reason this option cannot work, and DiPlay renders these notes under the list in warning colour.
+        assertTrue(report.carHotspotNotes.isEmpty())
+    }
 
-        prefs.edit().putString("default_connection_mode", "future_mode").commit()
-        assertEquals(DefaultConnectionMode.LAST_USED, DiPlayPreferences.defaultConnectionMode(context))
-        assertFalse(DiPlayPreferences.autoConnectWireless(context))
+    @Test fun bluetoothOffWithTheAdapterStillOffersTheHotspot() {
+        val report = DeviceConnectionSupport.assess(
+            ready(22).copy(bluetooth = BluetoothRead.OFF, adapterRfcomm = true),
+        )
+        assertEquals(listOf(UsableConnection.USB, UsableConnection.CAR_HOTSPOT), report.usable)
+        assertEquals(listOf(CarHotspotBlocker.BLUETOOTH_OFF), report.carHotspotNotes)
+    }
+
+    @Test fun theAdapterCannotSubstituteForTheHotspotCalls() {
+        val report = DeviceConnectionSupport.assess(
+            ready(22).copy(wifiManager = false, adapterRfcomm = true),
+        )
+        assertEquals(listOf(UsableConnection.USB), report.usable)
+        assertTrue(report.wirelessModes.isEmpty())
+        assertEquals(listOf(CarHotspotBlocker.NO_WIFI), report.carHotspotNotes)
+    }
+
+    @Test fun aSuppliedHopCarriesTheRfcommLegTheVendorStackCannot() {
+        val report = DeviceConnectionSupport.assess(
+            ready(22).copy(rfcommSocket = false, vendorHopRfcomm = true),
+        )
+        assertEquals(listOf(UsableConnection.USB, UsableConnection.CAR_HOTSPOT), report.usable)
+        assertEquals(listOf(WirelessHotspotMode.MANUAL), report.wirelessModes)
+        assertTrue(report.carHotspotNotes.isEmpty())
+    }
+
+    @Test fun aHeadUnitWithNoAospBluetoothOffersTheHotspotThroughASuppliedHop() {
+        val report = DeviceConnectionSupport.assess(
+            ready(22).copy(bluetooth = BluetoothRead.MISSING, vendorHopRfcomm = true),
+        )
+        assertEquals(listOf(UsableConnection.USB, UsableConnection.CAR_HOTSPOT), report.usable)
+        assertTrue(report.carHotspotNotes.isEmpty())
     }
 }

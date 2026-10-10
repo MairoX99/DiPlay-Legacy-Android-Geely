@@ -7,7 +7,7 @@ import android.os.Build
 import android.os.Binder
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import com.shilapi.xcertplay.airplay.AirPlayConfig
 import com.shilapi.xcertplay.airplay.AirPlayIdentity
 import com.shilapi.xcertplay.airplay.AirPlayMediaHandler
@@ -76,7 +76,7 @@ class CarPlayVpnService : VpnService() {
         media: AirPlayMediaHandler,
     ): AttachResult {
         if (active.get()) {
-            Log.i(TAG, "replacing stale NCM/VPN attachment")
+            DiagLog.i(TAG, "replacing stale NCM/VPN attachment")
             releaseLocked()
         }
         active.set(true)
@@ -93,7 +93,15 @@ class CarPlayVpnService : VpnService() {
                 .addRoute(LINK_LOCAL_ROUTE, LINK_PREFIX)
                 .setSession(SESSION_NAME)
                 .setMtu(TUN_MTU)
-            .apply { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) setBlocking(true) }
+                .apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        // A platform that refuses this leaves the descriptor non-blocking, where an
+                        // idle link reads back as EAGAIN. That is a different failure, further from
+                        // its cause, so it is recorded here rather than silently deferred.
+                        runCatching { setBlocking(true) }
+                            .onFailure { DiagLog.w(TAG, "tun setBlocking refused; descriptor stays non-blocking", it) }
+                    }
+                }
                 .establish()
                 ?: throw IOException("VpnService.establish returned null")
             tun = tunFd
@@ -130,7 +138,7 @@ class CarPlayVpnService : VpnService() {
         media: AirPlayMediaHandler,
     ): AttachResult {
         if (active.get()) {
-            Log.i(TAG, "replacing stale local-only Wi-Fi attachment")
+            DiagLog.i(TAG, "replacing stale local-only Wi-Fi attachment")
             releaseLocked()
         }
         active.set(true)
@@ -184,7 +192,7 @@ class CarPlayVpnService : VpnService() {
         try {
             while (active.get()) {
                 val socket: Socket = server.accept()
-                Log.i(TAG, "airplay connection accepted from ${socket.remoteSocketAddress}")
+                DiagLog.i(TAG, "airplay connection accepted from ${socket.remoteSocketAddress}")
                 socket.tcpNoDelay = true
                 socket.keepAlive = true
                 socket.setSoLinger(true, 0)
@@ -237,7 +245,7 @@ class CarPlayVpnService : VpnService() {
                 try {
                     session.close()
                 } catch (error: Exception) {
-                    Log.w(TAG, "AirPlay session replacement failed", error)
+                    DiagLog.w(TAG, "AirPlay session replacement failed", error)
                 }
             }
             sessions.clear()
@@ -250,7 +258,7 @@ class CarPlayVpnService : VpnService() {
         error: Throwable,
     ) {
         val message = error.message ?: error.javaClass.simpleName
-        Log.e(TAG, "CarPlay transport stopped: $message", error)
+        DiagLog.e(TAG, "CarPlay transport stopped: $message", error)
         Thread(
             {
                 synchronized(this) {

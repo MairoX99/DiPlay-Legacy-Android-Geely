@@ -3,6 +3,7 @@ package com.shilapi.xcertplay.airplay
 import android.util.Log
 import com.shilapi.xcertplay.mfi.MfiAuthenticator
 import com.shilapi.xcertplay.transport.BlockingDuplexByteStream
+import com.shilapi.xcertplay.transport.WiredLinkReport
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.Closeable
@@ -33,6 +34,13 @@ interface AirPlaySessionListener {
     fun onHostUiRequested(session: AirPlaySession) {}
     fun onCommand(session: AirPlaySession, type: String, params: Map<String, Any?>) {}
     fun onDebugLog(message: String) {}
+
+    /**
+     * The wired-link diagnosis whenever it changes, [WiredLinkFinding.NONE][com.shilapi.xcertplay.transport.WiredLinkFinding.NONE]
+     * included so a cleared fault clears with it. Structured rather than a log line because the screen
+     * turns it into the action to take, and a string would have to be parsed back apart to do that.
+     */
+    fun onWiredLinkReport(report: WiredLinkReport) {}
 }
 
 /** Stream transport seam; media decode/render is supplied by a later layer. */

@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.transport
 
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 import java.io.Closeable
 import java.util.ArrayDeque
 
@@ -24,7 +24,7 @@ class Iap2UsbMuxHost private constructor(
     private var nextMuxAcknowledgement = 0
     private var nextSourcePort = FIRST_SOURCE_PORT
     private lateinit var readerThread: Thread
-    private val receiveFrames = UsbMuxFrameBuffer { line -> Log.w("xcertplay-usb", line) }
+    private val receiveFrames = UsbMuxFrameBuffer { line -> DiagLog.w("xcertplay-usb", line) }
 
     /** Opens a TCP byte stream to the iPhone service on [destinationPort]. */
     fun connect(
@@ -79,7 +79,7 @@ class Iap2UsbMuxHost private constructor(
         flags: Int,
         payload: ByteArray,
     ) {
-        if (payload.size > 512) Log.i("xcertplay-usb", "usbmux TX source=$sourcePort destination=$destinationPort bytes=${payload.size} seq=$sequence ack=$acknowledgement")
+        if (payload.size > 512) DiagLog.i("xcertplay-usb", "usbmux TX source=$sourcePort destination=$destinationPort bytes=${payload.size} seq=$sequence ack=$acknowledgement")
         val tcp = ByteArray(TCP_HEADER_BYTES + payload.size)
         putU16(tcp, 0, sourcePort)
         putU16(tcp, 2, destinationPort)
@@ -135,9 +135,9 @@ class Iap2UsbMuxHost private constructor(
                         "length=${reply.length} version=${reply.word8}",
                 )
             }
-            Log.i("xcertplay-usb", "discarding stale usbmux TCP frame before version reply")
+            DiagLog.i("xcertplay-usb", "discarding stale usbmux TCP frame before version reply")
         }
-        Log.i("xcertplay-usb", "usbmux version accepted: ${reply.word8}")
+        DiagLog.i("xcertplay-usb", "usbmux version accepted: ${reply.word8}")
         sendFrame(PROTOCOL_SETUP, byteArrayOf(SETUP_VALUE.toByte()))
         readerThread = Thread(::readerLoop, "iap2-usbmux-reader").apply {
             isDaemon = true
@@ -219,7 +219,7 @@ class Iap2UsbMuxHost private constructor(
             throw IphoneUsbException.Protocol("Invalid USBMUX TCP header length")
         }
         val destinationPort = readU16(frame, offset + 2)
-        if (length == tcpHeaderBytes) Log.i("xcertplay-usb", "usbmux TCP control destination=$destinationPort flags=${frame[13].toInt() and 0xff} ack=${readU32(frame, 8)} window=${readU16(frame, 14)}")
+        if (length == tcpHeaderBytes) DiagLog.i("xcertplay-usb", "usbmux TCP control destination=$destinationPort flags=${frame[13].toInt() and 0xff} ack=${readU32(frame, 8)} window=${readU16(frame, 14)}")
         val connection = synchronized(stateLock) { connections[destinationPort] } ?: return
         connection.onPacket(
             flags = frame[offset + 13].toInt() and 0xff,

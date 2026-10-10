@@ -6,7 +6,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.DiagLog
 
 data class CarPlayUsbConfiguration(
     val id: Int,
@@ -42,7 +42,7 @@ object IphoneCarPlayConfiguration {
         }
         val chosen = configurations.firstOrNull { usbMuxInterface(it) != null && hasCdcNcm(it) && hasAppleEthernet(it) }
             ?: configurations.firstOrNull { usbMuxInterface(it) != null && hasCdcNcm(it) }
-        Log.i(
+        DiagLog.i(
             TAG,
             "carplay config chosen=${chosen?.id} " +
                 "available=${configurations.map { it.id }} detail=${chosen?.let(::describe)}",

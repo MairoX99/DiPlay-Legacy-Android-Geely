@@ -17,8 +17,8 @@ android {
         minSdk = 19
         targetSdk = 37
         multiDexEnabled = true
-        versionCode = 35
-        versionName = "0.3.5-geely-rc"
+        versionCode = 41
+        versionName = "4.0-geely-rc"
 
     }
 
@@ -108,3 +108,21 @@ tasks.register("assembleStandaloneDebug") {
     description = "Build a standalone car-test APK with explicitly provisioned authentication."
     dependsOn(verifyStandaloneAuthentication, "assembleDebug")
 }
+
+// The car hop is in the tree only when DIPLAY_VENDOR_HOP_DIR names it. A car-test APK without one runs
+// the AOSP stack and would waste the trip, so the standalone build asks for it as well.
+val verifyVendorHop by tasks.registering {
+    group = "verification"
+    description = "Require the car hop for a standalone car-test APK."
+    val directory = providers.environmentVariable("DIPLAY_VENDOR_HOP_DIR").orNull?.let { file(it) }
+    doLast {
+        check(directory != null) {
+            "Standalone car builds require DIPLAY_VENDOR_HOP_DIR; without it the APK carries no car hop."
+        }
+        check(directory.resolve("src/com/shilapi/xcertplay/carhop/VendorCarHop.kt").isFile) {
+            "DIPLAY_VENDOR_HOP_DIR does not hold the car hop source."
+        }
+    }
+}
+tasks.named("preBuild") { mustRunAfter(verifyVendorHop) }
+tasks.named("assembleStandaloneDebug") { dependsOn(verifyVendorHop) }

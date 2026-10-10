@@ -2,7 +2,6 @@
 <resources>
     <string name="default_connection_mode">默认连接</string>
     <string name="default_connection_last_used">上次使用</string>
-    <string name="default_connection_wireless">无线</string>
     <string name="default_connection_usb">USB</string>
     <string name="default_connection_description">打开 DiPlay 时按这个规划和已选 iPhone 连接。手动按钮仍走你点的那种。</string>
     <string name="connection_methods_supported">这台设备可以用：%1$s</string>

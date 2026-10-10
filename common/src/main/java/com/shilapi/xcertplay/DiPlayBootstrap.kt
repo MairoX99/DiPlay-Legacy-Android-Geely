@@ -5,6 +5,8 @@ import android.os.Build
 import com.shilapi.xcertplay.airplay.AirPlayIdentity
 import com.shilapi.xcertplay.mfi.LocalMfiAuthenticationClient
 import com.shilapi.xcertplay.orchestration.MfiTarget
+import com.shilapi.xcertplay.transport.ExternalBluetoothRoute
+import com.shilapi.xcertplay.transport.WirelessBluetoothHop
 import java.io.File
 import java.security.MessageDigest
 
@@ -57,36 +59,15 @@ internal object DiPlayPreferences {
     fun savePhone(context: Context, address: String, name: String) {
         prefs(context).edit().putString("phone_address", address).putString("phone_name", name).apply()
     }
-    fun defaultConnectionMode(context: Context) =
-        DefaultConnectionMode.fromKey(prefs(context).getString("default_connection_mode", null))
-
-    fun saveDefaultConnectionMode(context: Context, mode: DefaultConnectionMode) {
-        prefs(context).edit().putString("default_connection_mode", mode.key).apply()
+    /**
+     * The radio a wireless run uses. With the adapter hop off there is one radio left, so it is the
+     * answer whether or not the driver ever picked it — the page no longer shows a choice to make.
+     */
+    fun bluetoothHop(context: Context): WirelessBluetoothHop? {
+        if (!ExternalBluetoothRoute.enabled) return WirelessBluetoothHop.CAR
+        return WirelessBluetoothHop.fromKey(prefs(context).getString("bluetooth_hop", null))
     }
-
-    /** Transport used when DiPlay opens by itself. Manual buttons keep the mode the user picks. */
-    fun autoConnectWireless(context: Context) =
-        defaultConnectionMode(context).wireless(AirPlayPersistence.loadWirelessEnabled(context))
-
-    fun autoConnect(context: Context) = prefs(context).getBoolean("auto_connect", false)
-    fun saveAutoConnect(context: Context, value: Boolean) {
-        prefs(context).edit().putBoolean("auto_connect", value).apply()
-    }
-}
-
-internal enum class DefaultConnectionMode(val key: String) {
-    LAST_USED("last_used"),
-    WIRELESS("wireless"),
-    USB("usb");
-
-    fun wireless(lastUsedWireless: Boolean): Boolean = when (this) {
-        LAST_USED -> lastUsedWireless
-        WIRELESS -> true
-        USB -> false
-    }
-
-    companion object {
-        fun fromKey(key: String?): DefaultConnectionMode =
-            entries.firstOrNull { it.key == key } ?: LAST_USED
+    fun saveBluetoothHop(context: Context, hop: WirelessBluetoothHop) {
+        prefs(context).edit().putString("bluetooth_hop", hop.key).apply()
     }
 }
