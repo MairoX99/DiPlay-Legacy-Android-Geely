@@ -1695,7 +1695,11 @@ class CarPlayController(
         )
         val connection = usbManager.openDevice(device)
             ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
-        return NcmUsbBridge.open(connection, function)
+        return NcmUsbBridge.open(
+            connection,
+            function,
+            airPlaySessionLive = { activeSession != null },
+        )
     }
 
     private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge) {
@@ -1772,6 +1776,9 @@ class CarPlayController(
                 deviceIdentifier = ncmHostMac.macString(),
             )
             onStatus(CarPlayStatus.RunningControl)
+            // The phone asks its user before it accepts NCM traffic, so from here a failed bulk OUT
+            // write is that question rather than a fault.
+            ncm.awaitCarPlayAuthorization()
             // From here the phone is drawing current, which is what makes a supply dip something the
             // cycles can be evidence of rather than a guess.
             WiredLinkCycles.shared.noteSessionRan()

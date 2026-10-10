@@ -5,6 +5,7 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbRequest
+import android.os.SystemClock
 import com.shilapi.xcertplay.DiagLog
 import java.io.Closeable
 import java.nio.ByteBuffer
@@ -26,6 +27,8 @@ class NcmUsbBridge internal constructor(
     private val statusEndpoint: UsbEndpoint?,
     private val claimedInterfaces: List<UsbInterface>,
     descriptorHostMac: ByteArray?,
+    private val airPlaySessionLive: () -> Boolean = { true },
+    private val writeWindow: NcmWriteWindow = NcmWriteWindow(),
 ) : Closeable {
     private val descriptorMac = descriptorHostMac?.copyOf()
     val hostMac: ByteArray? get() = descriptorMac?.copyOf()
@@ -36,6 +39,7 @@ class NcmUsbBridge internal constructor(
     private var failure: IphoneUsbException? = null
     private var sequence = 0
     private var loggedWriteTimeout = false
+    private var loggedAuthorizationWait = false
     @Volatile private var inboundFrameSeen = false
     private var consecutiveWriteFailures = 0
     private val frames = ArrayDeque<ByteArray>()
@@ -79,12 +83,34 @@ class NcmUsbBridge internal constructor(
                 }
                 return@synchronized
             }
-            // The phone only sends once its data path is up, so from here a run of failures means bulk
-            // OUT alone is gone: inbound video keeps arriving while touch, return audio and TCP ACKs
+            // The phone only sends once its data path is up, so from here a run of failures usually means
+            // bulk OUT alone is gone: inbound video keeps arriving while touch, return audio and TCP ACKs
             // are dropped, and the user watches a frozen screen with no error. Android reports a NAK,
             // a timeout and a latched halt with the same failed result. CLEAR_FEATURE(ENDPOINT_HALT)
             // also resets the data toggle when the endpoint was not halted, so a single NAK is not
             // cleared here; three failures end the session and the reopen clears a real halt.
+            when (writeWindow.verdict(clockMillis(), airPlaySessionLive())) {
+                NcmWriteWindow.Verdict.EXPECTED -> {
+                    // The user answers the phone's dialog on the phone's clock, so a hold here is a wait
+                    // rather than a fault, however many transfers it costs.
+                    if (!loggedAuthorizationWait) {
+                        loggedAuthorizationWait = true
+                        DiagLog.i(
+                            IphoneCarPlayConfiguration.TAG,
+                            "ncm bulk-out held for the phone's CarPlay authorization; not counting",
+                        )
+                    }
+                    consecutiveWriteFailures = 0
+                    return@synchronized
+                }
+
+                NcmWriteWindow.Verdict.EXPIRED -> throw failSession(
+                    "NCM write failed while the phone never authorized CarPlay within " +
+                        "${NcmWriteWindow.AUTHORIZATION_GRACE_MILLIS / MILLIS_PER_SECOND}s",
+                )
+
+                NcmWriteWindow.Verdict.FAULT -> Unit
+            }
             consecutiveWriteFailures += 1
             DiagLog.i(
                 IphoneCarPlayConfiguration.TAG,
@@ -104,11 +130,21 @@ class NcmUsbBridge internal constructor(
             throw failSession("NCM write transferred $transferred of ${block.size} bytes")
         }
         consecutiveWriteFailures = 0
+        loggedAuthorizationWait = false
         if (loggedWriteTimeout) {
             loggedWriteTimeout = false
             DiagLog.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
         }
     }
+
+    /**
+     * Opens the window in which failed bulk OUT writes are the phone's CarPlay authorization dialog
+     * rather than a fault. Call when the phone is asked to start CarPlay, before any AirPlay session
+     * exists; the window closes by itself when that session arrives, and expires if it never does.
+     */
+    fun awaitCarPlayAuthorization() = writeWindow.arm(clockMillis())
+
+    private fun clockMillis(): Long = SystemClock.elapsedRealtime()
 
     /**
      * Returns the next complete Ethernet frame, or null when [timeoutMillis] elapses without one.
@@ -322,10 +358,15 @@ class NcmUsbBridge internal constructor(
         private const val MAX_QUEUED_FRAMES = 256
         private const val MAX_QUEUED_BYTES = 1 shl 20
         private const val MAX_CONSECUTIVE_WRITE_FAILURES = 3
+        private const val MILLIS_PER_SECOND = 1_000L
         private const val NANOS_PER_MILLISECOND = 1_000_000L
 
         /** Claims and activates the NCM control/data interfaces; owns the connection on success. */
-        fun open(connection: UsbDeviceConnection, function: NcmFunctionDiscovery.NcmFunction): NcmUsbBridge {
+        fun open(
+            connection: UsbDeviceConnection,
+            function: NcmFunctionDiscovery.NcmFunction,
+            airPlaySessionLive: () -> Boolean = { true },
+        ): NcmUsbBridge {
             val claimed = ArrayList<UsbInterface>(2)
             try {
                 val descriptorHostMac = readNcmHostMac(connection, function.control.id)
@@ -384,6 +425,7 @@ class NcmUsbBridge internal constructor(
                     function.statusIn,
                     claimed,
                     descriptorHostMac,
+                    airPlaySessionLive = airPlaySessionLive,
                 )
             } catch (error: Throwable) {
                 for (usbInterface in claimed.asReversed()) {
