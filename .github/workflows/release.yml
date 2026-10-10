@@ -1,11 +1,14 @@
 name: Release car-test APK
 
-# Bump versionName in mobile/build.gradle.kts, write docs/release-notes/v<versionName>.md
-# in the same commit, and push to main. The tag is derived from versionName — never
-# created by hand — and a version that already has a Release is left alone.
+# Bump versionName in mobile/build.gradle.kts and write docs/release-notes/v<versionName>.md
+# before running this. The tag is derived from versionName — never created by hand — and a
+# version that already has a Release is left alone.
+#
+# Runs only when asked. A push to main publishes nothing: what this job builds is a plain
+# checkout, which has none of the local-only inputs a release build is made with, so it is not
+# the package to hand out. Cut the release from the machine that has them, and use a manual run
+# here only to check that the tree builds.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       dry_run:
